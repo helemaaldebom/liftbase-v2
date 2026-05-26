@@ -1,0 +1,13 @@
+{
+  "name": "hclifters-backup-script",
+  "version": "1.0.0",
+  "description": "Automatisch backup script voor HC-Lifters database naar OneDrive",
+  "type": "module",
+  "scripts": {
+    "backup": "node backup-to-onedrive.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "archiver": "^7.0.1"
+  }
+}

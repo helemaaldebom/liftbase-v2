@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test AI Photo Sorting</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #555;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 20px 0;
+      color: #6366f1;
+    }
+    .loading.active {
+      display: block;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .success {
+      background: #d1fae5;
+      border: 1px solid #10b981;
+      color: #065f46;
+    }
+    .error {
+      background: #fee2e2;
+      border: 1px solid #ef4444;
+      color: #991b1b;
+    }
+    .info {
+      background: #dbeafe;
+      border: 1px solid #3b82f6;
+      color: #1e40af;
+      margin-bottom: 20px;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #6366f1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 Test AI Photo Sorting</h1>
+    <p class="subtitle">Test de AI foto sortering functionaliteit</p>
+
+    <div class="info">
+      <strong>ℹ️ Instructies:</strong><br>
+      1. Vul het Dossier ID in (bijvoorbeeld: sb1-nqcqgxqb)<br>
+      2. Klik op "Test AI Sortering"<br>
+      3. Bekijk de gedetailleerde logs hieronder
+    </div>
+
+    <form id="testForm">
+      <label for="dossierId">Dossier ID:</label>
+      <input
+        type="text"
+        id="dossierId"
+        value="sb1-nqcqgxqb"
+        placeholder="Bijvoorbeeld: sb1-nqcqgxqb"
+        required
+      />
+
+      <button type="submit" id="submitBtn">Test AI Sortering</button>
+    </form>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>AI analyseert foto's... Dit kan 10-30 seconden duren</p>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('testForm');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const submitBtn = document.getElementById('submitBtn');
+    const dossierIdInput = document.getElementById('dossierId');
+
+    // Supabase configuratie
+    const SUPABASE_URL = 'https://wcjegvxnojzirwxogesj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjamVndnhub2p6aXJ3eG9nZXNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzNjcxODcsImV4cCI6MjA3Njk0MzE4N30.MpQ1FU4Wmc_kbZnevScMay4sALMN1mPN3sbTn5e3sfk';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const dossierId = dossierIdInput.value.trim();
+      if (!dossierId) {
+        showResult('error', 'Vul een Dossier ID in');
+        return;
+      }
+
+      // Reset
+      result.innerHTML = '';
+      loading.classList.add('active');
+      submitBtn.disabled = true;
+
+      const logs = [];
+
+      try {
+        logs.push(`[${new Date().toLocaleTimeString()}] Start AI foto sortering voor dossier: ${dossierId}`);
+        logs.push(`[${new Date().toLocaleTimeString()}] Supabase URL: ${SUPABASE_URL}`);
+
+        // Test 1: Check of edge function bereikbaar is
+        logs.push(`\n[${new Date().toLocaleTimeString()}] Test 1: Edge function bereikbaarheid...`);
+        const apiUrl = `${SUPABASE_URL}/functions/v1/sort-photos-with-ai`;
+        logs.push(`[${new Date().toLocaleTimeString()}] API URL: ${apiUrl}`);
+
+        // Test 2: Roep edge function aan
+        logs.push(`\n[${new Date().toLocaleTimeString()}] Test 2: Edge function aanroepen...`);
+
+        const startTime = Date.now();
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dossierId }),
+        });
+
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        logs.push(`[${new Date().toLocaleTimeString()}] Response ontvangen in ${duration}s`);
+        logs.push(`[${new Date().toLocaleTimeString()}] Status: ${response.status} ${response.statusText}`);
+        logs.push(`[${new Date().toLocaleTimeString()}] OK: ${response.ok}`);
+
+        // Log response headers
+        logs.push(`\n[${new Date().toLocaleTimeString()}] Response Headers:`);
+        response.headers.forEach((value, key) => {
+          logs.push(`  ${key}: ${value}`);
+        });
+
+        // Get response body
+        const responseText = await response.text();
+        logs.push(`\n[${new Date().toLocaleTimeString()}] Response Body:`);
+        logs.push(responseText);
+
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          logs.push(`\n[${new Date().toLocaleTimeString()}] Parsed JSON:`);
+          logs.push(JSON.stringify(responseData, null, 2));
+        } catch (parseError) {
+          logs.push(`\n[${new Date().toLocaleTimeString()}] Failed to parse as JSON: ${parseError.message}`);
+        }
+
+        if (!response.ok) {
+          logs.push(`\n[${new Date().toLocaleTimeString()}] ❌ ERROR: Request failed`);
+          const errorMessage = responseData?.error || responseData?.message || responseText || 'Unknown error';
+          logs.push(`[${new Date().toLocaleTimeString()}] Error message: ${errorMessage}`);
+          showResult('error', logs.join('\n'));
+          return;
+        }
+
+        logs.push(`\n[${new Date().toLocaleTimeString()}] ✅ SUCCESS!`);
+        logs.push(`[${new Date().toLocaleTimeString()}] ${responseData.message || 'Foto\'s gesorteerd'}`);
+
+        if (responseData.order) {
+          logs.push(`\n[${new Date().toLocaleTimeString()}] Nieuwe volgorde (${responseData.order.length} foto's):`);
+          responseData.order.forEach((id, index) => {
+            logs.push(`  ${index + 1}. ${id}`);
+          });
+        }
+
+        showResult('success', logs.join('\n'));
+
+      } catch (error) {
+        logs.push(`\n[${new Date().toLocaleTimeString()}] ❌ EXCEPTION: ${error.name}`);
+        logs.push(`[${new Date().toLocaleTimeString()}] Message: ${error.message}`);
+        logs.push(`[${new Date().toLocaleTimeString()}] Stack: ${error.stack}`);
+        showResult('error', logs.join('\n'));
+      } finally {
+        loading.classList.remove('active');
+        submitBtn.disabled = false;
+      }
+    });
+
+    function showResult(type, message) {
+      result.className = `result ${type}`;
+      result.textContent = message;
+    }
+  </script>
+</body>
+</html>

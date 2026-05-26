@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Maintenance Document Extraction</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .test-section {
+      background: #f5f5f5;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #4CAF50;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Maintenance Document Extraction</h1>
+
+  <div class="test-section">
+    <h2>1. Check Documents in Database</h2>
+    <button onclick="checkDocuments()">Check Documents</button>
+    <div id="documents-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. Check Line Items</h2>
+    <button onclick="checkLineItems()">Check Line Items</button>
+    <div id="lineitems-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>3. Check Edge Function Logs</h2>
+    <p>Go to Supabase Dashboard → Edge Functions → extract-maintenance-document → Logs</p>
+  </div>
+
+  <div class="test-section">
+    <h2>4. Check OpenAI API Key</h2>
+    <button onclick="checkEnvVars()">Check Environment Variables</button>
+    <div id="env-result"></div>
+  </div>
+
+  <script>
+    // Initialize Supabase client
+    const SUPABASE_URL = '';  // PASTE YOUR SUPABASE URL HERE
+    const SUPABASE_ANON_KEY = '';  // PASTE YOUR ANON KEY HERE
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      document.body.innerHTML = '<div class="error">Please update the SUPABASE_URL and SUPABASE_ANON_KEY in this HTML file</div>';
+    }
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function checkDocuments() {
+      const result = document.getElementById('documents-result');
+      result.innerHTML = '<p>Loading...</p>';
+
+      try {
+        const { data, error } = await supabase
+          .from('maintenance_documents')
+          .select('*')
+          .order('uploaded_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+          result.innerHTML = '<div class="error">No documents found</div>';
+          return;
+        }
+
+        let html = `<div class="success">Found ${data.length} documents</div>`;
+        html += '<table>';
+        html += '<tr><th>File Name</th><th>Extraction Status</th><th>Match Status</th><th>Line Items</th><th>Raw Data</th></tr>';
+
+        for (const doc of data) {
+          html += `<tr>
+            <td>${doc.file_name}</td>
+            <td>${doc.extraction_status || 'N/A'}</td>
+            <td>${doc.match_status || 'N/A'}</td>
+            <td>${doc.raw_extraction_data?.line_items?.length || 0}</td>
+            <td>${doc.extraction_error || 'N/A'}</td>
+          </tr>`;
+        }
+        html += '</table>';
+
+        html += '<h3>Raw Data Sample:</h3>';
+        html += '<pre>' + JSON.stringify(data[0], null, 2) + '</pre>';
+
+        result.innerHTML = html;
+      } catch (error) {
+        result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function checkLineItems() {
+      const result = document.getElementById('lineitems-result');
+      result.innerHTML = '<p>Loading...</p>';
+
+      try {
+        const { data, error } = await supabase
+          .from('maintenance_line_items')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+
+        if (data.length === 0) {
+          result.innerHTML = '<div class="error">No line items found. This is the problem!</div>';
+          return;
+        }
+
+        let html = `<div class="success">Found ${data.length} line items</div>`;
+        html += '<table>';
+        html += '<tr><th>Description</th><th>Amount</th><th>Currency</th><th>Category</th><th>Confidence</th></tr>';
+
+        for (const item of data) {
+          html += `<tr>
+            <td>${item.description}</td>
+            <td>${item.amount_excl_vat}</td>
+            <td>${item.currency}</td>
+            <td>${item.category}</td>
+            <td>${item.category_confidence}</td>
+          </tr>`;
+        }
+        html += '</table>';
+
+        result.innerHTML = html;
+      } catch (error) {
+        result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function checkEnvVars() {
+      const result = document.getElementById('env-result');
+      result.innerHTML = `
+        <div class="error">
+          <p><strong>Cannot check edge function environment variables from browser.</strong></p>
+          <p>Please check in Supabase Dashboard:</p>
+          <ol>
+            <li>Go to Project Settings → Edge Functions</li>
+            <li>Check if OPENAI_API_KEY is set</li>
+            <li>If not, add it as a secret</li>
+          </ol>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

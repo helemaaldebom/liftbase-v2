@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Terms Loading</title>
+</head>
+<body>
+    <h1>Test Terms and Conditions Loading</h1>
+    <div id="results"></div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        async function testTermsFiles() {
+            const files = [
+                'terms_and_conditions_of_sales_uk.pdf',
+                'verkoopvoorwaarden_nl.pdf',
+                'verkoopvoorwaarden_de.pdf',
+                'verkoopvoorwaarden_es.pdf',
+                'verkoopvoorwaarden_fr.pdf'
+            ];
+
+            for (const file of files) {
+                try {
+                    const response = await fetch(`/${file}`);
+                    const status = response.ok ? '✅ OK' : '❌ FAILED';
+                    const size = response.headers.get('content-length');
+                    resultsDiv.innerHTML += `<p>${status} - ${file} (${size} bytes, status: ${response.status})</p>`;
+                    console.log(`${file}: status ${response.status}, size ${size}`);
+                } catch (error) {
+                    resultsDiv.innerHTML += `<p>❌ ERROR - ${file}: ${error.message}</p>`;
+                    console.error(`Error loading ${file}:`, error);
+                }
+            }
+        }
+
+        testTermsFiles();
+    </script>
+</body>
+</html>

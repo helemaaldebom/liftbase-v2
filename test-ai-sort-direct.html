@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test AI Sort Direct</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0 0 20px 0;
+      color: #333;
+    }
+    label {
+      display: block;
+      margin: 15px 0 5px 0;
+      font-weight: 600;
+      color: #555;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #9333ea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+      width: 100%;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #7e22ce;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      display: none;
+    }
+    #result.success {
+      background: #d1fae5;
+      border: 1px solid #10b981;
+      color: #065f46;
+      display: block;
+    }
+    #result.error {
+      background: #fee2e2;
+      border: 1px solid #ef4444;
+      color: #991b1b;
+      display: block;
+    }
+    #result.loading {
+      background: #dbeafe;
+      border: 1px solid #3b82f6;
+      color: #1e40af;
+      display: block;
+    }
+    .info {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      padding: 12px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #92400e;
+    }
+    .step {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧪 Test AI Sort Functie</h1>
+
+    <div class="info">
+      <strong>Stappen:</strong>
+      <div class="step">1. Open eerst een dossier in de app en kopieer de Dossier ID uit de URL</div>
+      <div class="step">2. Plak de ID hieronder</div>
+      <div class="step">3. Klik op "Test AI Sort"</div>
+      <div class="step">4. Bekijk het resultaat hieronder</div>
+    </div>
+
+    <label>Supabase URL (uit .env):</label>
+    <input type="text" id="supabaseUrl" placeholder="https://xxx.supabase.co">
+
+    <label>Supabase Anon Key (uit .env):</label>
+    <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+
+    <label>Dossier ID:</label>
+    <input type="text" id="dossierId" placeholder="abc123-def456-ghi789...">
+
+    <button id="testBtn" onclick="testAISort()">Test AI Sort</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    async function testAISort() {
+      const resultDiv = document.getElementById('result');
+      const testBtn = document.getElementById('testBtn');
+
+      const supabaseUrl = document.getElementById('supabaseUrl').value.trim();
+      const supabaseKey = document.getElementById('supabaseKey').value.trim();
+      const dossierId = document.getElementById('dossierId').value.trim();
+
+      if (!supabaseUrl || !supabaseKey || !dossierId) {
+        resultDiv.className = 'error';
+        resultDiv.textContent = 'ERROR: Vul alle velden in!';
+        return;
+      }
+
+      try {
+        testBtn.disabled = true;
+        resultDiv.className = 'loading';
+        resultDiv.textContent = 'Bezig met testen... Dit kan 10-30 seconden duren.\n\n[' + new Date().toLocaleTimeString() + '] Calling AI sort function...';
+
+        const apiUrl = `${supabaseUrl}/functions/v1/sort-photos-with-ai`;
+
+        console.log('=== TEST AI SORT ===');
+        console.log('API URL:', apiUrl);
+        console.log('Dossier ID:', dossierId);
+        console.log('Time:', new Date().toISOString());
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dossierId }),
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response OK:', response.ok);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+        const responseText = await response.text();
+        console.log('Response text:', responseText);
+
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          result = { rawResponse: responseText };
+        }
+
+        if (response.ok) {
+          resultDiv.className = 'success';
+          resultDiv.textContent = '✅ SUCCESS!\n\n' + JSON.stringify(result, null, 2);
+          console.log('✅ AI sort successful:', result);
+        } else {
+          resultDiv.className = 'error';
+          resultDiv.textContent = `❌ ERROR (Status ${response.status})\n\n` + JSON.stringify(result, null, 2);
+          console.error('❌ AI sort failed:', result);
+        }
+
+      } catch (error) {
+        console.error('❌ Exception:', error);
+        resultDiv.className = 'error';
+        resultDiv.textContent = `❌ EXCEPTION:\n\n${error.message}\n\n${error.stack}`;
+      } finally {
+        testBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

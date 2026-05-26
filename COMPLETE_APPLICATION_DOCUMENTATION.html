@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Application Documentation - Heavy Cargo Lifters</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            line-height: 1.6;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 1in;
+            color: #333;
+            background: white;
+        }
+        h1 {
+            color: #1a1a1a;
+            font-size: 28pt;
+            margin-top: 24pt;
+            margin-bottom: 12pt;
+            page-break-before: always;
+            border-bottom: 3pt solid #0066cc;
+            padding-bottom: 6pt;
+        }
+        h1:first-of-type {
+            page-break-before: avoid;
+        }
+        h2 {
+            color: #0066cc;
+            font-size: 20pt;
+            margin-top: 18pt;
+            margin-bottom: 10pt;
+            border-bottom: 1pt solid #cccccc;
+            padding-bottom: 4pt;
+        }
+        h3 {
+            color: #333;
+            font-size: 16pt;
+            margin-top: 14pt;
+            margin-bottom: 8pt;
+            font-weight: bold;
+        }
+        h4 {
+            color: #555;
+            font-size: 13pt;
+            margin-top: 12pt;
+            margin-bottom: 6pt;
+            font-weight: bold;
+        }
+        p {
+            margin: 8pt 0;
+            text-align: justify;
+        }
+        ul, ol {
+            margin: 8pt 0;
+            padding-left: 30pt;
+        }
+        li {
+            margin: 4pt 0;
+        }
+        code {
+            font-family: 'Courier New', monospace;
+            background-color: #f4f4f4;
+            padding: 2pt 4pt;
+            border-radius: 3pt;
+            font-size: 10pt;
+        }
+        pre {
+            font-family: 'Courier New', monospace;
+            background-color: #f4f4f4;
+            padding: 10pt;
+            border-left: 3pt solid #0066cc;
+            overflow-x: auto;
+            margin: 10pt 0;
+            font-size: 9pt;
+            line-height: 1.4;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10pt 0;
+        }
+        th, td {
+            border: 1pt solid #ddd;
+            padding: 8pt;
+            text-align: left;
+        }
+        th {
+            background-color: #0066cc;
+            color: white;
+            font-weight: bold;
+        }
+        .metadata {
+            background-color: #f9f9f9;
+            border: 1pt solid #ddd;
+            padding: 12pt;
+            margin: 12pt 0;
+        }
+        .metadata strong {
+            color: #0066cc;
+        }
+        hr {
+            border: none;
+            border-top: 1pt solid #cccccc;
+            margin: 20pt 0;
+        }
+        .toc {
+            background-color: #f4f4f4;
+            padding: 15pt;
+            margin: 20pt 0;
+            border-left: 4pt solid #0066cc;
+        }
+        .toc ol {
+            margin: 8pt 0;
+        }
+        .check {
+            color: #00aa00;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ff8800;
+            font-weight: bold;
+        }
+        .error {
+            color: #cc0000;
+            font-weight: bold;
+        }
+        .feature-list {
+            margin-left: 20pt;
+        }
+        .code-block {
+            background-color: #f8f8f8;
+            border: 1pt solid #ddd;
+            padding: 10pt;
+            margin: 10pt 0;
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Complete Application Documentation</h1>
+<h2>Heavy Cargo Lifters - Port Equipment Valuation &amp; Trading Platform</h2>
+
+<div class="metadata">
+    <p><strong>Version:</strong> 1.0</p>
+    <p><strong>Last Updated:</strong> February 10, 2026</p>
+    <p><strong>Target Audience:</strong> Developers and Technical Stakeholders</p>
+</div>
+
+<hr>
+
+<div class="toc">
+<h2>Table of Contents</h2>
+<ol>
+    <li>Overview</li>
+    <li>Architecture</li>
+    <li>User Roles &amp; Permissions</li>
+    <li>Core Modules</li>
+    <li>Database Schema</li>
+    <li>Edge Functions</li>
+    <li>External Integrations</li>
+    <li>Incomplete Features &amp; Technical Debt</li>
+    <li>Known Issues</li>
+    <li>Development Setup</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>1. Overview</h2>
+
+<p>Heavy Cargo Lifters is a comprehensive platform for managing, valuing, and trading port equipment (forklifts, reachstackers, empty container handlers, and terminal tractors). The system handles the complete lifecycle from equipment intake, valuation, dealer bidding, publication to marketplaces, and sales tracking.</p>
+
+<h3>Key Business Functions</h3>
+<ul>
+    <li>Equipment intake and technical specification documentation</li>
+    <li>AI-powered photo organization and documentation</li>
+    <li>Market data analysis and price suggestions</li>
+    <li>Dealer network management and bidding system</li>
+    <li>Multi-language PDF generation (NL, EN, DE)</li>
+    <li>Publication to external marketplaces (Mascus, Forklift International)</li>
+    <li>Maintenance document extraction and tracking</li>
+    <li>Customer portal for direct equipment browsing</li>
+</ul>
+
+<h3>Technology Stack</h3>
+<ul>
+    <li><strong>Frontend:</strong> React 18 + TypeScript + Vite</li>
+    <li><strong>Styling:</strong> Tailwind CSS</li>
+    <li><strong>Backend:</strong> Supabase (PostgreSQL + Edge Functions)</li>
+    <li><strong>Storage:</strong> Supabase Storage (photos, documents, videos)</li>
+    <li><strong>PDF Generation:</strong> jsPDF + pdf-lib</li>
+    <li><strong>Maps:</strong> Leaflet + OpenStreetMap</li>
+    <li><strong>AI:</strong> OpenAI GPT-4o (via Supabase Edge Functions)</li>
+</ul>
+
+<hr>
+
+<h2>2. Architecture</h2>
+
+<h3>Frontend Architecture</h3>
+<pre>
+src/
+├── components/          # React components
+├── pages/              # Page-level components
+├── contexts/           # React contexts (Auth, Language)
+├── lib/                # Supabase client, types
+├── utils/              # Utility functions (PDF, Excel export, price suggestions)
+└── main.tsx           # Application entry point
+</pre>
+
+<h3>Backend Architecture</h3>
+<ul>
+    <li><strong>Database:</strong> PostgreSQL (Supabase managed)</li>
+    <li><strong>Authentication:</strong> Supabase Auth (email/password)</li>
+    <li><strong>Storage Buckets:</strong>
+        <ul>
+            <li><code>dossier-photos</code> - Equipment photos</li>
+            <li><code>dossier-attachments</code> - Equipment documents</li>
+            <li><code>dossier-videos</code> - Equipment videos</li>
+            <li><code>maintenance-documents</code> - Maintenance/service records</li>
+        </ul>
+    </li>
+    <li><strong>Edge Functions:</strong> Deno-based serverless functions for AI processing, external API integrations, and data imports</li>
+</ul>
+
+<h3>Security Model</h3>
+<ul>
+    <li>Row Level Security (RLS) on all tables</li>
+    <li>Role-based access control (RBAC)</li>
+    <li>Authenticated and service role policies</li>
+    <li>Public read access for customer portal</li>
+    <li>Secure storage bucket policies</li>
+</ul>
+
+<hr>
+
+<h2>3. User Roles &amp; Permissions</h2>
+
+<h3>1. Admin (Full Access)</h3>
+<ul>
+    <li>Complete system access</li>
+    <li>User management</li>
+    <li>All CRUD operations</li>
+    <li>System configuration</li>
+</ul>
+
+<h3>2. Manager (Management Access)</h3>
+<ul>
+    <li>Create/edit/delete dossiers</li>
+    <li>User management (limited)</li>
+    <li>Dealer management</li>
+    <li>View all bids and financials</li>
+    <li>Market data management</li>
+    <li>Publication management</li>
+</ul>
+
+<h3>3. Verkoper (Sales User)</h3>
+<ul>
+    <li>Create/edit dossiers</li>
+    <li>View assigned dossiers</li>
+    <li>Create bids</li>
+    <li>Cannot delete dossiers</li>
+    <li>Limited financial visibility</li>
+</ul>
+
+<h3>4. Eindgebruiker (End User / Valuation Tool Access)</h3>
+<ul>
+    <li>Access to valuation tool only</li>
+    <li>Create dossiers for valuation</li>
+    <li>View market data</li>
+    <li>Cannot publish or sell equipment</li>
+    <li>Read-only on others' dossiers</li>
+</ul>
+
+<h3>5. Dealer (External Partner)</h3>
+<ul>
+    <li>View published equipment</li>
+    <li>Submit bids</li>
+    <li>View own bid history</li>
+    <li>Limited to assigned equipment</li>
+</ul>
+
+<h3>6. Customer (Public Access)</h3>
+<ul>
+    <li>Browse published equipment via customer portal</li>
+    <li>View photos and specifications</li>
+    <li>Contact for inquiries</li>
+    <li>No login required</li>
+</ul>
+
+<hr>
+
+<h2>4. Core Modules</h2>
+
+<h3>Module 1: Dossier Management System</h3>
+
+<p><strong>Purpose:</strong> Central equipment documentation and lifecycle tracking</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Equipment Types Supported:</strong></p>
+<ul class="feature-list">
+    <li>Heavy Duty Forklifts</li>
+    <li>Empty Container Handlers (ECH)</li>
+    <li>Reachstackers</li>
+    <li>Terminal Tractors</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Dossier Creation:</strong></p>
+<ul class="feature-list">
+    <li>Auto-generated dossier numbers (HCL26-XXX format)</li>
+    <li>Equipment type selection</li>
+    <li>Basic information (brand, model, year, location)</li>
+    <li>Condition assessment</li>
+    <li>GPS coordinates (with map visualization)</li>
+    <li>Customer name tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Technical Details Forms:</strong></p>
+<ul class="feature-list">
+    <li>Equipment-specific detail forms</li>
+    <li>Auto-sync with main dossier table</li>
+    <li>Comprehensive specifications:
+        <ul>
+            <li>Engine details (brand, type, power)</li>
+            <li>Transmission details</li>
+            <li>Axle specifications</li>
+            <li>Mast specifications (for forklifts)</li>
+            <li>Cabin features (heater, AC, lights)</li>
+            <li>Tire specifications</li>
+            <li>Hydraulic systems</li>
+            <li>Attachments and accessories</li>
+            <li>Dimensions and weights</li>
+            <li>Running hours</li>
+        </ul>
+    </li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Photo Management:</strong></p>
+<ul class="feature-list">
+    <li>Upload multiple photos</li>
+    <li>AI-powered photo categorization (14 categories)</li>
+    <li>Manual category override</li>
+    <li>Drag-and-drop reordering</li>
+    <li>Visibility toggle (visible online/internal only)</li>
+    <li>Photo deletion</li>
+    <li>Categories: Front, Rear, Side, Mast, Cabin, Engine, Attachments, Damage, Tires, Dashboard, Overview, etc.</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Document Management:</strong></p>
+<ul class="feature-list">
+    <li>Upload equipment documents (manuals, certificates)</li>
+    <li>Support for PDF, images, Office documents</li>
+    <li>Document type categorization</li>
+    <li>Download and delete capabilities</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Video Management:</strong></p>
+<ul class="feature-list">
+    <li>Upload equipment videos</li>
+    <li>Video storage and playback</li>
+    <li>Visibility control</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Maintenance Documents:</strong></p>
+<ul class="feature-list">
+    <li>Upload service/maintenance records</li>
+    <li>AI-powered data extraction from PDFs</li>
+    <li>Automatic field population</li>
+    <li>Manual review and approval system</li>
+    <li>Track maintenance history</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Status Workflow:</strong></p>
+<ul class="feature-list">
+    <li>Draft → Open → Stock → Bidding → Sold → Archived</li>
+    <li>Status-based access control</li>
+    <li>Visual status indicators</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Financial Tracking:</strong></p>
+<ul class="feature-list">
+    <li>Purchase price</li>
+    <li>Estimated value (valuation)</li>
+    <li>Sale price</li>
+    <li>Price history tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Dossier Actions:</strong></p>
+<ul class="feature-list">
+    <li>Copy dossier (duplicate with new number)</li>
+    <li>Export to PDF (internal &amp; external versions)</li>
+    <li>Export to Excel</li>
+    <li>Delete (with cascade to photos, bids, details)</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/DossierDetailPage.tsx</code> (main page)</li>
+    <li><code>src/components/ForkliftDetailsForm.tsx</code></li>
+    <li><code>src/components/EmptyContainerHandlerDetailsForm.tsx</code></li>
+    <li><code>src/components/ReachstackerDetailsForm.tsx</code></li>
+    <li><code>src/components/TerminalTractorDetailsForm.tsx</code></li>
+    <li><code>src/components/PhotoGallery.tsx</code></li>
+    <li><code>src/components/PhotoUpload.tsx</code></li>
+    <li><code>src/components/DocumentUpload.tsx</code></li>
+    <li><code>src/components/VideoUpload.tsx</code></li>
+    <li><code>src/components/MaintenanceUpload.tsx</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>dossiers</code> (main table)</li>
+    <li><code>forklift_details</code></li>
+    <li><code>empty_container_handler_details</code></li>
+    <li><code>reachstacker_details</code></li>
+    <li><code>terminal_tractor_details</code></li>
+    <li><code>photos</code></li>
+    <li><code>dossier_attachments</code></li>
+    <li><code>videos</code></li>
+    <li><code>maintenance_documents</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 2: Bidding System</h3>
+
+<p><strong>Purpose:</strong> Manage dealer bids and negotiations</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Bid Creation:</strong></p>
+<ul class="feature-list">
+    <li>Manual bid entry by managers/sellers</li>
+    <li>Amount and currency</li>
+    <li>Status tracking (Pending, Submitted, Accepted, Rejected)</li>
+    <li>Notes field</li>
+    <li>Dealer assignment</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Bid Invitation System:</strong></p>
+<ul class="feature-list">
+    <li>Send email invitations to dealers</li>
+    <li>Custom message</li>
+    <li>Direct link to equipment</li>
+    <li>Invitation tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Bulk Offers:</strong></p>
+<ul class="feature-list">
+    <li>Send offers to multiple dealers simultaneously</li>
+    <li>Equipment details included</li>
+    <li>Automated email distribution</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Dealer Bid Submission:</strong></p>
+<ul class="feature-list">
+    <li>Dealers can submit bids via dealer portal</li>
+    <li>Bid amount entry</li>
+    <li>Optional notes</li>
+    <li>Status tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Bid Management:</strong></p>
+<ul class="feature-list">
+    <li>View all bids per dossier</li>
+    <li>Accept/reject bids</li>
+    <li>Track bid history</li>
+    <li>Financial overview</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Known Limitations:</strong></p>
+<ul class="feature-list">
+    <li>No automated bid expiration</li>
+    <li>No bid comparison tools</li>
+    <li>Limited notification system</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/components/BidsSection.tsx</code></li>
+    <li><code>src/components/NewBidModal.tsx</code></li>
+    <li><code>src/components/BulkOfferModal.tsx</code></li>
+    <li><code>src/pages/BiedingenPage.tsx</code> (all bids overview)</li>
+    <li><code>supabase/functions/send-bid-invitation/</code></li>
+    <li><code>supabase/functions/bulk-offer-to-dealers/</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>bids</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 3: Dealer Management</h3>
+
+<p><strong>Purpose:</strong> Manage dealer network and access</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Dealer Database:</strong></p>
+<ul class="feature-list">
+    <li>Company name</li>
+    <li>Contact person</li>
+    <li>Email (optional)</li>
+    <li>Phone</li>
+    <li>Country</li>
+    <li>City</li>
+    <li>Notes</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Dealer Account Creation:</strong></p>
+<ul class="feature-list">
+    <li>Create Supabase auth account for dealer</li>
+    <li>Auto-generate secure password</li>
+    <li>Send credentials via email</li>
+    <li>Link dealer profile to auth account</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Dealer Portal:</strong></p>
+<ul class="feature-list">
+    <li>Separate dealer dashboard</li>
+    <li>View published equipment</li>
+    <li>Submit bids</li>
+    <li>View bid history</li>
+    <li>Limited access (only published equipment)</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Incomplete Features:</strong></p>
+<ul class="feature-list">
+    <li>No dealer self-registration</li>
+    <li>No dealer profile management by dealer</li>
+    <li>No dealer performance analytics</li>
+    <li>No dealer communication history</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/DealersPage.tsx</code></li>
+    <li><code>src/components/NewDealerModal.tsx</code></li>
+    <li><code>src/components/CreateDealerLoginModal.tsx</code></li>
+    <li><code>src/pages/DealerDashboardPage.tsx</code></li>
+    <li><code>src/pages/DealerDossierViewPage.tsx</code></li>
+    <li><code>supabase/functions/create-dealer-account/</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>dealers</code></li>
+    <li>Link to <code>auth.users</code> via <code>auth_user_id</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 4: Market Data &amp; Valuation System</h3>
+
+<p><strong>Purpose:</strong> Market intelligence and price suggestion engine</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Market Data Database:</strong></p>
+<ul class="feature-list">
+    <li>Historical sales data</li>
+    <li>Equipment specifications</li>
+    <li>Sale prices and dates</li>
+    <li>Market sources (websites, auctions)</li>
+    <li>Search functionality</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Manual Data Entry:</strong></p>
+<ul class="feature-list">
+    <li>Form-based entry for each equipment type</li>
+    <li>Comprehensive specification fields</li>
+    <li>Sale price and date tracking</li>
+    <li>Source documentation</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>CSV Import System:</strong></p>
+<ul class="feature-list">
+    <li>Bulk import from Excel/CSV</li>
+    <li>Template provided</li>
+    <li>Field mapping</li>
+    <li>Validation and error handling</li>
+    <li>Equipment type auto-detection</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Price Suggestion Algorithm:</strong></p>
+<ul class="feature-list">
+    <li>Match based on:
+        <ul>
+            <li>Equipment type</li>
+            <li>Brand</li>
+            <li>Model</li>
+            <li>Year (+/- 3 years)</li>
+            <li>Capacity</li>
+            <li>Hours (weighted)</li>
+            <li>Condition</li>
+        </ul>
+    </li>
+    <li>Display similar equipment</li>
+    <li>Confidence scoring</li>
+    <li>Price range suggestions</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Web Scraping Integration:</strong></p>
+<ul class="feature-list">
+    <li>Mascus scraper (automated)</li>
+    <li>Store scraped data</li>
+    <li>Image URL storage</li>
+    <li>Screenshot capability</li>
+    <li>Duplicate detection</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Known Limitations:</strong></p>
+<ul class="feature-list">
+    <li>Price algorithm needs refinement (basic matching)</li>
+    <li>No machine learning model</li>
+    <li>Limited scraping sources</li>
+    <li>No automated price updates</li>
+    <li>Manual scraping activation required</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/MarktdataDatabasePage.tsx</code></li>
+    <li><code>src/pages/MarktdataInvoerenPage.tsx</code></li>
+    <li><code>src/pages/MarktdataImportPage.tsx</code></li>
+    <li><code>src/pages/TaxatiePage.tsx</code> (valuation tool)</li>
+    <li><code>src/components/PriceSuggestion.tsx</code></li>
+    <li><code>src/components/MarktdataForkliftForm.tsx</code></li>
+    <li><code>src/components/MarktdataECHForm.tsx</code></li>
+    <li><code>src/components/MarktdataReachstackerForm.tsx</code></li>
+    <li><code>src/components/MarktdataTerminalTractorForm.tsx</code></li>
+    <li><code>src/utils/priceSuggestion.ts</code></li>
+    <li><code>supabase/functions/import-marktdata/</code></li>
+    <li><code>supabase/functions/scrape-mascus/</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>marktdata</code></li>
+    <li><code>price_history</code></li>
+    <li><code>marktdata_access_log</code> (track eindgebruiker access)</li>
+</ul>
+
+<hr>
+
+<h3>Module 5: Publication System</h3>
+
+<p><strong>Purpose:</strong> Publish equipment to external marketplaces</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Publication Platforms:</strong></p>
+<ul class="feature-list">
+    <li>Mascus (equipment marketplace)</li>
+    <li>Forklift International (forklift-specific)</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Mascus Integration:</strong></p>
+<ul class="feature-list">
+    <li>HTTP request queue system</li>
+    <li>Publish equipment with photos</li>
+    <li>Update equipment</li>
+    <li>Unpublish (delete)</li>
+    <li>Track publication status</li>
+    <li>API credentials management</li>
+    <li>Request logging and error tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Forklift International Integration:</strong></p>
+<ul class="feature-list">
+    <li>Equipment publication</li>
+    <li>Photo upload (up to 30)</li>
+    <li>Specification mapping</li>
+    <li>Daily sync (update prices, status)</li>
+    <li>Unpublish capability</li>
+    <li>Publication tracking</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Publication Dashboard:</strong></p>
+<ul class="feature-list">
+    <li>Overview of all published equipment</li>
+    <li>Platform-specific views</li>
+    <li>Publication status tracking</li>
+    <li>Quick publish/unpublish actions</li>
+    <li>Sync status monitoring</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Advertisement Sync:</strong></p>
+<ul class="feature-list">
+    <li>Track external advertisement IDs</li>
+    <li>Sync status updates</li>
+    <li>Error tracking</li>
+    <li>Manual retry capability</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Known Issues:</strong></p>
+<ul class="feature-list">
+    <li>HTTP request queue can have null URL errors (needs debugging)</li>
+    <li>Mascus API sometimes fails silently</li>
+    <li>Forklift International field mapping incomplete for some equipment types</li>
+    <li>No automated retry for failed publications</li>
+    <li>Limited error reporting to users</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/PublicationDashboardPage.tsx</code></li>
+    <li><code>src/components/PublicationSection.tsx</code></li>
+    <li><code>supabase/functions/publish-to-mascus/</code></li>
+    <li><code>supabase/functions/publish-to-forklift-international/</code></li>
+    <li><code>supabase/functions/sync-advertisements/</code></li>
+    <li><code>supabase/functions/daily-forklift-international-sync/</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>advertisements</code></li>
+    <li><code>http_request_queue</code></li>
+    <li><code>api_credentials</code></li>
+</ul>
+
+<h4>Documentation:</h4>
+<ul>
+    <li><code>FORKLIFT_INTERNATIONAL_SETUP.md</code></li>
+    <li><code>FORKLIFT_INTERNATIONAL_FIELD_MAPPING.md</code></li>
+    <li><code>FORKLIFT_INTERNATIONAL_DEBUG.md</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 6: PDF Generation System</h3>
+
+<p><strong>Purpose:</strong> Generate professional equipment documentation</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>PDF Types:</strong></p>
+<ul class="feature-list">
+    <li><strong>Internal Report:</strong> Full details including serials, bids, internal notes</li>
+    <li><strong>External Report:</strong> Customer-facing, excludes sensitive info, includes T&amp;C</li>
+    <li><strong>Clean External:</strong> Minimal version without footer/terms</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Multi-Language Support:</strong></p>
+<ul class="feature-list">
+    <li>Dutch (NL)</li>
+    <li>English (EN)</li>
+    <li>German (DE)</li>
+    <li>Translated labels and terminology</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Content Sections:</strong></p>
+<ul class="feature-list">
+    <li>Company logo (HCL)</li>
+    <li>Equipment title (brand + model)</li>
+    <li>Hero photo (front view)</li>
+    <li>General information table</li>
+    <li>Technical specifications (equipment-specific)</li>
+    <li>Description/remarks</li>
+    <li>Bid overview (internal only)</li>
+    <li>Photo gallery (all visible photos)</li>
+    <li>Company footer with contact info</li>
+    <li>Terms &amp; conditions (external only, language-specific)</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Features:</strong></p>
+<ul class="feature-list">
+    <li>Image compression (performance)</li>
+    <li>Multi-page layout</li>
+    <li>Auto page breaks</li>
+    <li>Professional styling</li>
+    <li>Conditional field display</li>
+    <li>Equipment-specific specifications</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Security:</strong></p>
+<ul class="feature-list">
+    <li>Serial numbers HIDDEN in external PDFs (as of latest update)</li>
+    <li>Stock ID shown</li>
+    <li>Sensitive internal info excluded from external versions</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/utils/pdfExport.ts</code></li>
+</ul>
+
+<h4>Assets:</h4>
+<ul>
+    <li><code>/public/hclifters.jpg</code> (logo)</li>
+    <li><code>/public/verkoopvoorwaarden_nl.pdf</code></li>
+    <li><code>/public/verkoopvoorwaarden_de.pdf</code></li>
+    <li><code>/public/terms_and_conditions_of_sales_uk.pdf</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 7: Excel Export System</h3>
+
+<p><strong>Purpose:</strong> Export equipment data for analysis</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Export Capabilities:</strong></p>
+<ul class="feature-list">
+    <li>Export all dossiers to Excel</li>
+    <li>Export market data to Excel</li>
+    <li>Customizable column selection</li>
+    <li>Formatted tables with headers</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Data Included:</strong></p>
+<ul class="feature-list">
+    <li>All dossier fields</li>
+    <li>Technical specifications</li>
+    <li>Status and dates</li>
+    <li>Financial data</li>
+    <li>Location information</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/utils/excelExport.ts</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 8: AI-Powered Features</h3>
+
+<p><strong>Purpose:</strong> Automate repetitive tasks with AI</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>AI Photo Categorization:</strong></p>
+<ul class="feature-list">
+    <li>Analyze equipment photos</li>
+    <li>Assign to 14 predefined categories</li>
+    <li>Confidence scoring</li>
+    <li>Batch processing</li>
+    <li>Manual override capability</li>
+    <li>OpenAI GPT-4o Vision integration</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Maintenance Document Extraction:</strong></p>
+<ul class="feature-list">
+    <li>Extract text from PDF maintenance documents</li>
+    <li>Identify key information:
+        <ul>
+            <li>Service dates</li>
+            <li>Running hours</li>
+            <li>Service type</li>
+            <li>Parts replaced</li>
+            <li>Technician notes</li>
+        </ul>
+    </li>
+    <li>Auto-populate dossier fields</li>
+    <li>Manual review workflow</li>
+    <li>Approval/rejection system</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Known Limitations:</strong></p>
+<ul class="feature-list">
+    <li>Photo categorization accuracy ~85% (needs training)</li>
+    <li>Maintenance extraction depends on document format</li>
+    <li>No batch processing UI for maintenance docs</li>
+    <li>Extraction limited to PDF format</li>
+    <li>No OCR for scanned documents</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>supabase/functions/sort-photos-with-ai/</code></li>
+    <li><code>supabase/functions/extract-maintenance-document/</code></li>
+    <li><code>supabase/functions/extract-pdf-data/</code> (general PDF extraction)</li>
+</ul>
+
+<h4>Documentation:</h4>
+<ul>
+    <li><code>AI_FOTO_SORTERING_INSTRUCTIES.md</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 9: Customer Portal</h3>
+
+<p><strong>Purpose:</strong> Public-facing equipment catalog</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Public Access:</strong></p>
+<ul class="feature-list">
+    <li>No login required</li>
+    <li>View published equipment</li>
+    <li>Browse by equipment type</li>
+    <li>Search functionality</li>
+    <li>Filter capabilities</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Equipment Display:</strong></p>
+<ul class="feature-list">
+    <li>Photo gallery</li>
+    <li>Technical specifications</li>
+    <li>Location map</li>
+    <li>Contact information</li>
+    <li>Download PDF</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Incomplete Features:</strong></p>
+<ul class="feature-list">
+    <li>No shopping cart</li>
+    <li>No direct inquiry form</li>
+    <li>No equipment comparison</li>
+    <li>Limited filtering options</li>
+    <li>No saved searches</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/CustomerPortalPage.tsx</code></li>
+</ul>
+
+<h4>Database Access:</h4>
+<ul>
+    <li>Uses public read policies on <code>dossiers</code> table</li>
+    <li>Filtered to show only <code>status = 'stock'</code> equipment</li>
+</ul>
+
+<hr>
+
+<h3>Module 10: Dashboard &amp; Analytics</h3>
+
+<p><strong>Purpose:</strong> Business intelligence and overview</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Main Dashboard:</strong></p>
+<ul class="feature-list">
+    <li>Equipment count by status</li>
+    <li>Recent dossiers</li>
+    <li>Pending bids</li>
+    <li>Quick actions</li>
+    <li>Search functionality</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Data Overview Widget:</strong></p>
+<ul class="feature-list">
+    <li>Total equipment count</li>
+    <li>Status breakdown</li>
+    <li>Value statistics</li>
+    <li>Visual charts</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Fleet Dashboard:</strong></p>
+<ul class="feature-list">
+    <li>Equipment by type</li>
+    <li>Location distribution</li>
+    <li>Age distribution</li>
+    <li>Value overview</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Map Overview:</strong></p>
+<ul class="feature-list">
+    <li>Geographic distribution</li>
+    <li>Interactive markers</li>
+    <li>Equipment clustering</li>
+    <li>Location-based filtering</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Missing Analytics:</strong></p>
+<ul class="feature-list">
+    <li>No sales trends</li>
+    <li>No dealer performance metrics</li>
+    <li>No time-on-market tracking</li>
+    <li>No profit/margin analysis</li>
+    <li>No forecasting</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/DashboardPage.tsx</code></li>
+    <li><code>src/components/DataOverviewWidget.tsx</code></li>
+    <li><code>src/components/FleetDashboard.tsx</code></li>
+    <li><code>src/components/MapOverview.tsx</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 11: Search &amp; Navigation</h3>
+
+<p><strong>Purpose:</strong> Quick access to equipment and data</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Global Search:</strong></p>
+<ul class="feature-list">
+    <li>Search across all dossiers</li>
+    <li>Search by:
+        <ul>
+            <li>Dossier number</li>
+            <li>Brand</li>
+            <li>Model</li>
+            <li>Location</li>
+            <li>Customer name</li>
+        </ul>
+    </li>
+    <li>Real-time results</li>
+    <li>Quick navigation</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Navigation Structure:</strong></p>
+<ul class="feature-list">
+    <li>Main dashboard</li>
+    <li>Dossiers list</li>
+    <li>Dealer management</li>
+    <li>Bidding overview</li>
+    <li>Market data</li>
+    <li>Publications</li>
+    <li>Settings</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Filtering:</strong></p>
+<ul class="feature-list">
+    <li>Status filters</li>
+    <li>Equipment type filters</li>
+    <li>Date range filters</li>
+    <li>Text search</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/components/GlobalSearch.tsx</code></li>
+    <li><code>src/components/DossierNavbar.tsx</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 12: User Management</h3>
+
+<p><strong>Purpose:</strong> Manage internal users and access</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>User Creation:</strong></p>
+<ul class="feature-list">
+    <li>Email/password authentication</li>
+    <li>Role assignment</li>
+    <li>Profile information</li>
+    <li>Language preference</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>User Roles:</strong></p>
+<ul class="feature-list">
+    <li>Admin</li>
+    <li>Manager</li>
+    <li>Verkoper</li>
+    <li>Eindgebruiker</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>User Actions:</strong></p>
+<ul class="feature-list">
+    <li>Create users</li>
+    <li>Update user info</li>
+    <li>Delete users</li>
+    <li>Reset passwords</li>
+    <li>Change roles</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Test User System:</strong></p>
+<ul class="feature-list">
+    <li>Create test users for development</li>
+    <li>Reset test passwords</li>
+    <li>Sandbox environment support</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/pages/SettingsPage.tsx</code></li>
+    <li><code>supabase/functions/create-test-users/</code></li>
+    <li><code>supabase/functions/update-user/</code></li>
+    <li><code>supabase/functions/delete-user/</code></li>
+    <li><code>supabase/functions/reset-test-passwords/</code></li>
+</ul>
+
+<h4>Database Tables:</h4>
+<ul>
+    <li><code>user_profiles</code> (synced with auth.users)</li>
+</ul>
+
+<h4>Documentation:</h4>
+<ul>
+    <li><code>USER_DELETION_GUIDE.md</code></li>
+    <li><code>GEBRUIKERSROLLEN_OVERZICHT.md</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 13: Multi-Language System</h3>
+
+<p><strong>Purpose:</strong> Support international users</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Supported Languages:</strong></p>
+<ul class="feature-list">
+    <li>Dutch (NL) - primary</li>
+    <li>English (EN)</li>
+    <li>German (DE)</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Translation Coverage:</strong></p>
+<ul class="feature-list">
+    <li>UI labels</li>
+    <li>Form fields</li>
+    <li>PDF documents</li>
+    <li>Email templates</li>
+    <li>Status labels</li>
+    <li>Equipment types</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>User Preference:</strong></p>
+<ul class="feature-list">
+    <li>Per-user language setting</li>
+    <li>Persistent across sessions</li>
+    <li>Easy switching</li>
+</ul>
+
+<p><span class="warning">⚠️</span> <strong>Incomplete:</strong></p>
+<ul class="feature-list">
+    <li>Not all screens translated</li>
+    <li>Some hardcoded Dutch text</li>
+    <li>Missing translations in edge functions</li>
+    <li>No translation management system</li>
+</ul>
+
+<h4>File Location:</h4>
+<ul>
+    <li><code>src/contexts/LanguageContext.tsx</code></li>
+    <li><code>src/lib/translations.ts</code></li>
+</ul>
+
+<hr>
+
+<h3>Module 14: Storage &amp; Media Management</h3>
+
+<p><strong>Purpose:</strong> Manage files and media</p>
+
+<h4>Key Features:</h4>
+
+<p><span class="check">✅</span> <strong>Storage Buckets:</strong></p>
+<ul class="feature-list">
+    <li>Dossier photos (up to 10MB each)</li>
+    <li>Equipment documents (up to 50MB)</li>
+    <li>Equipment videos (up to 100MB)</li>
+    <li>Maintenance documents (up to 20MB)</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>File Operations:</strong></p>
+<ul class="feature-list">
+    <li>Upload with progress</li>
+    <li>Download</li>
+    <li>Delete</li>
+    <li>Public URL generation</li>
+    <li>Access control</li>
+</ul>
+
+<p><span class="check">✅</span> <strong>Security:</strong></p>
+<ul class="feature-list">
+    <li>RLS on storage buckets</li>
+    <li>Role-based access</li>
+    <li>Public read for customer portal</li>
+    <li>Authenticated write</li>
+</ul>
+
+<h4>Configuration:</h4>
+<ul>
+    <li>Supabase Storage Policies</li>
+    <li>See migrations for bucket setup</li>
+</ul>
+
+<hr>
+
+<h2>5. Database Schema</h2>
+
+<h3>Core Tables</h3>
+
+<h4>Table: dossiers</h4>
+<p>Main equipment records table.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_number</code> (text, unique) - Auto-generated HCL26-XXX</li>
+    <li><code>title</code> (text)</li>
+    <li><code>description</code> (text)</li>
+    <li><code>equipment_type</code> (text) - heavy_duty_forklift, container_handler, reachstacker, terminal_tractor</li>
+    <li><code>brand</code> (text)</li>
+    <li><code>model</code> (text)</li>
+    <li><code>year</code> (integer)</li>
+    <li><code>condition</code> (text) - excellent, good, fair, poor</li>
+    <li><code>location</code> (text)</li>
+    <li><code>gps_latitude</code> (numeric)</li>
+    <li><code>gps_longitude</code> (numeric)</li>
+    <li><code>customer_name</code> (text)</li>
+    <li><code>estimated_value</code> (numeric)</li>
+    <li><code>purchase_price</code> (numeric)</li>
+    <li><code>sale_price</code> (numeric)</li>
+    <li><code>status</code> (text) - draft, open, stock, bidding, sold, archived</li>
+    <li><code>created_by</code> (uuid, FK → user_profiles)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+    <li><code>updated_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>Indexes:</strong></p>
+<ul>
+    <li>dossier_number</li>
+    <li>status</li>
+    <li>equipment_type</li>
+    <li>created_by</li>
+</ul>
+
+<p><strong>RLS Policies:</strong></p>
+<ul>
+    <li>Authenticated users can read all</li>
+    <li>Managers/admins can insert</li>
+    <li>Owners and managers can update</li>
+    <li>Managers can delete</li>
+    <li>Public can read published (status='stock')</li>
+</ul>
+
+<hr>
+
+<h4>Table: forklift_details</h4>
+<p>Extended forklift specifications.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_id</code> (uuid, FK → dossiers)</li>
+    <li><code>order_no</code> (text) - Stock ID</li>
+    <li><code>serial_no</code> (text) - Serial number</li>
+    <li><code>brand</code> (text)</li>
+    <li><code>type</code> (text) - Model</li>
+    <li><code>power</code> (text) - Diesel, Electric, LPG, Hybrid</li>
+    <li><code>capacity_kg</code> (integer)</li>
+    <li><code>load_center_mm</code> (integer)</li>
+    <li><code>year_of_manufacture</code> (integer)</li>
+    <li><code>hours_on_clock</code> (integer)</li>
+    <li><code>mast</code> (text)</li>
+    <li><code>mast_type</code> (text)</li>
+    <li><code>free_lift</code> (text)</li>
+    <li><code>lift_height_mm</code> (integer)</li>
+    <li><code>cabin_type</code> (text)</li>
+    <li><code>heater</code> (boolean)</li>
+    <li><code>airco</code> (boolean)</li>
+    <li><code>engine_brand</code> (text)</li>
+    <li><code>engine_type</code> (text)</li>
+    <li><code>trans_brand</code> (text)</li>
+    <li><code>trans_type</code> (text)</li>
+    <li><code>shift_type</code> (text)</li>
+    <li><code>adblue</code> (boolean)</li>
+    <li><code>particle_filter</code> (text)</li>
+    <li><code>forks_length_mm</code> (integer)</li>
+    <li><code>forks_width_mm</code> (integer)</li>
+    <li><code>forks_thickness_mm</code> (integer)</li>
+    <li><code>no_forks</code> (boolean)</li>
+    <li><code>hydraulic_lines</code> (integer)</li>
+    <li><code>tires_front</code> (text)</li>
+    <li><code>tires_rear</code> (text)</li>
+    <li><code>seat_brand</code> (text)</li>
+    <li><code>attachment</code> (text)</li>
+    <li><code>remark</code> (text)</li>
+    <li>Plus 30+ more technical fields</li>
+</ul>
+
+<p><strong>Triggers:</strong></p>
+<ul>
+    <li>Auto-create on dossier insert</li>
+    <li>Sync brand/model/year with dossier</li>
+</ul>
+
+<hr>
+
+<h4>Table: empty_container_handler_details</h4>
+<p>Extended ECH specifications.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li>Similar structure to forklift_details</li>
+    <li>ECH-specific fields:
+        <ul>
+            <li><code>double_box_type</code> (text)</li>
+            <li><code>spreader_type</code> (text)</li>
+            <li>Container-specific measurements</li>
+        </ul>
+    </li>
+</ul>
+
+<hr>
+
+<h4>Table: reachstacker_details</h4>
+<p>Extended reachstacker specifications.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li>Similar structure to forklift_details</li>
+    <li>Reachstacker-specific fields:
+        <ul>
+            <li><code>stacking_height_1_over_5</code> (integer)</li>
+            <li><code>stacking_height_loaded</code> (integer)</li>
+            <li><code>capacity_row_2_3_kg</code> (integer)</li>
+            <li><code>capacity_row_4_5_kg</code> (integer)</li>
+        </ul>
+    </li>
+</ul>
+
+<hr>
+
+<h4>Table: terminal_tractor_details</h4>
+<p>Extended terminal tractor specifications.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li>Similar structure to forklift_details</li>
+    <li>Terminal tractor-specific fields:
+        <ul>
+            <li><code>fifth_wheel_height_mm</code> (integer)</li>
+            <li><code>coupling_type</code> (text)</li>
+        </ul>
+    </li>
+</ul>
+
+<hr>
+
+<h4>Table: bids</h4>
+<p>Dealer bids on equipment.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_id</code> (uuid, FK → dossiers)</li>
+    <li><code>dealer_id</code> (uuid, FK → dealers)</li>
+    <li><code>bedrag</code> (numeric) - Legacy amount field</li>
+    <li><code>amount</code> (numeric) - Amount</li>
+    <li><code>valuta</code> (text) - Currency (EUR, USD)</li>
+    <li><code>status</code> (text) - pending, submitted, accepted, rejected</li>
+    <li><code>notitie</code> (text) - Notes (legacy)</li>
+    <li><code>notes</code> (text) - Notes</li>
+    <li><code>sales_price</code> (numeric) - Final sale price if accepted</li>
+    <li><code>created_by</code> (uuid, FK → user_profiles)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>RLS Policies:</strong></p>
+<ul>
+    <li>Authenticated can read</li>
+    <li>Managers/verkoper can insert</li>
+    <li>Managers can update/delete</li>
+    <li>Dealers can insert on their assigned dossiers</li>
+</ul>
+
+<hr>
+
+<h4>Table: dealers</h4>
+<p>Dealer network database.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>name</code> (text) - Company name</li>
+    <li><code>contact_person</code> (text)</li>
+    <li><code>email</code> (text)</li>
+    <li><code>phone</code> (text)</li>
+    <li><code>country</code> (text)</li>
+    <li><code>city</code> (text)</li>
+    <li><code>notes</code> (text)</li>
+    <li><code>auth_user_id</code> (uuid) - Link to auth.users</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>RLS Policies:</strong></p>
+<ul>
+    <li>Authenticated can read all</li>
+    <li>Managers can insert/update/delete</li>
+</ul>
+
+<hr>
+
+<h4>Table: photos</h4>
+<p>Equipment photos.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_id</code> (uuid, FK → dossiers)</li>
+    <li><code>storage_path</code> (text) - Supabase storage path</li>
+    <li><code>filename</code> (text)</li>
+    <li><code>category</code> (text) - voorkant, achterkant, zijkant, etc.</li>
+    <li><code>visible_online</code> (boolean) - Show in customer portal</li>
+    <li><code>display_order</code> (integer) - Manual ordering</li>
+    <li><code>uploaded_by</code> (uuid, FK → user_profiles)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>RLS Policies:</strong></p>
+<ul>
+    <li>Authenticated can read all</li>
+    <li>Authenticated can insert</li>
+    <li>Owner/manager can update/delete</li>
+    <li>Public can read if visible_online = true</li>
+</ul>
+
+<hr>
+
+<h4>Table: marktdata</h4>
+<p>Market intelligence database.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>equipment_type</code> (text)</li>
+    <li><code>brand</code> (text)</li>
+    <li><code>model</code> (text)</li>
+    <li><code>year</code> (integer)</li>
+    <li><code>capacity_kg</code> (integer)</li>
+    <li><code>load_center_mm</code> (integer)</li>
+    <li><code>hours</code> (integer)</li>
+    <li><code>condition</code> (text)</li>
+    <li><code>sale_price</code> (numeric)</li>
+    <li><code>sale_date</code> (date)</li>
+    <li><code>sale_location</code> (text)</li>
+    <li><code>source</code> (text) - Website, auction, internal</li>
+    <li><code>source_url</code> (text)</li>
+    <li><code>screenshot_url</code> (text) - From web scraper</li>
+    <li><code>image_urls</code> (text[]) - Photo URLs from scraper</li>
+    <li><code>scraped_data</code> (jsonb) - Raw scraper output</li>
+    <li><code>created_by</code> (uuid, FK → user_profiles)</li>
+    <li>Plus 50+ equipment-specific fields</li>
+</ul>
+
+<p><strong>RLS Policies:</strong></p>
+<ul>
+    <li>Authenticated can read</li>
+    <li>Authenticated can insert</li>
+    <li>Managers can update/delete</li>
+    <li>Eindgebruiker access logged</li>
+</ul>
+
+<hr>
+
+<h4>Table: advertisements</h4>
+<p>External publication tracking.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_id</code> (uuid, FK → dossiers)</li>
+    <li><code>platform</code> (text) - mascus, forklift_international</li>
+    <li><code>external_id</code> (text) - Platform's advertisement ID</li>
+    <li><code>status</code> (text) - published, unpublished, failed</li>
+    <li><code>published_at</code> (timestamptz)</li>
+    <li><code>last_synced_at</code> (timestamptz)</li>
+    <li><code>error_message</code> (text)</li>
+</ul>
+
+<hr>
+
+<h4>Table: http_request_queue</h4>
+<p>Queue system for external API calls.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>url</code> (text)</li>
+    <li><code>method</code> (text) - GET, POST, PUT, DELETE</li>
+    <li><code>headers</code> (jsonb)</li>
+    <li><code>body</code> (jsonb)</li>
+    <li><code>status</code> (text) - pending, processing, completed, failed</li>
+    <li><code>response</code> (jsonb)</li>
+    <li><code>error_message</code> (text)</li>
+    <li><code>retry_count</code> (integer)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+    <li><code>processed_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>Known Issue:</strong> Sometimes contains null URLs (needs investigation)</p>
+
+<hr>
+
+<h4>Table: user_profiles</h4>
+<p>User profile extensions.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK, FK → auth.users)</li>
+    <li><code>full_name</code> (text)</li>
+    <li><code>role</code> (text) - admin, manager, verkoper, eindgebruiker</li>
+    <li><code>language_preference</code> (text) - nl, en, de</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>Triggers:</strong></p>
+<ul>
+    <li>Auto-create on auth.users insert</li>
+</ul>
+
+<hr>
+
+<h4>Table: api_credentials</h4>
+<p>Secure credential storage.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>service_name</code> (text)</li>
+    <li><code>api_key</code> (text) - Encrypted</li>
+    <li><code>api_secret</code> (text) - Encrypted</li>
+    <li><code>additional_config</code> (jsonb)</li>
+    <li><code>created_by</code> (uuid)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<p><strong>Supported Services:</strong></p>
+<ul>
+    <li>mascus</li>
+    <li>forklift_international</li>
+    <li>openai</li>
+</ul>
+
+<hr>
+
+<h4>Table: maintenance_documents</h4>
+<p>Service record tracking.</p>
+
+<p><strong>Key Fields:</strong></p>
+<ul>
+    <li><code>id</code> (uuid, PK)</li>
+    <li><code>dossier_id</code> (uuid, FK → dossiers)</li>
+    <li><code>file_path</code> (text) - Storage path</li>
+    <li><code>filename</code> (text)</li>
+    <li><code>extracted_data</code> (jsonb) - AI extraction results</li>
+    <li><code>manual_review_status</code> (text) - pending, approved, rejected</li>
+    <li><code>reviewed_by</code> (uuid, FK → user_profiles)</li>
+    <li><code>reviewed_at</code> (timestamptz)</li>
+    <li><code>created_at</code> (timestamptz)</li>
+</ul>
+
+<hr>
+
+<h3>Full Schema Visualization</h3>
+
+<pre>
+dossiers (main)
+├── forklift_details
+├── empty_container_handler_details
+├── reachstacker_details
+├── terminal_tractor_details
+├── photos
+├── dossier_attachments
+├── videos
+├── bids
+│   └── dealers
+├── advertisements
+└── maintenance_documents
+
+user_profiles → auth.users
+
+marktdata (standalone)
+
+http_request_queue (standalone)
+
+api_credentials (standalone)
+</pre>
+
+<hr>
+
+<h2>6. Edge Functions</h2>
+
+<p>All edge functions are Deno-based and deployed to Supabase.</p>
+
+<h3>1. sort-photos-with-ai</h3>
+<p><strong>Purpose:</strong> AI-powered photo categorization</p>
+<p><strong>Trigger:</strong> Manual via API call</p>
+<p><strong>Technology:</strong> OpenAI GPT-4o Vision</p>
+<p><strong>Input:</strong> Array of photo IDs</p>
+<p><strong>Output:</strong> Category assignments with confidence scores</p>
+<p><strong>Cost:</strong> ~$0.01-0.03 per batch (depending on photo count)</p>
+<p><strong>File:</strong> <code>supabase/functions/sort-photos-with-ai/index.ts</code></p>
+
+<hr>
+
+<h3>2. extract-maintenance-document</h3>
+<p><strong>Purpose:</strong> Extract data from maintenance PDFs</p>
+<p><strong>Trigger:</strong> Manual via upload</p>
+<p><strong>Technology:</strong> OpenAI GPT-4o + PDF.js</p>
+<p><strong>Input:</strong> PDF file path</p>
+<p><strong>Output:</strong> Structured JSON with extracted fields</p>
+<p><strong>File:</strong> <code>supabase/functions/extract-maintenance-document/index.ts</code></p>
+
+<hr>
+
+<h3>3. publish-to-mascus</h3>
+<p><strong>Purpose:</strong> Publish equipment to Mascus marketplace</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> HTTP API integration</p>
+<p><strong>Input:</strong> Dossier ID</p>
+<p><strong>Output:</strong> External advertisement ID</p>
+<p><strong>File:</strong> <code>supabase/functions/publish-to-mascus/index.ts</code></p>
+
+<hr>
+
+<h3>4. publish-to-forklift-international</h3>
+<p><strong>Purpose:</strong> Publish equipment to Forklift International</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> HTTP API integration</p>
+<p><strong>Known Issues:</strong> Field mapping incomplete for ECH/Reachstacker</p>
+<p><strong>File:</strong> <code>supabase/functions/publish-to-forklift-international/index.ts</code></p>
+
+<hr>
+
+<h3>5. daily-forklift-international-sync</h3>
+<p><strong>Purpose:</strong> Sync published ads with FI platform</p>
+<p><strong>Trigger:</strong> Scheduled (daily via cron)</p>
+<p><strong>Technology:</strong> HTTP API</p>
+<p><strong>File:</strong> <code>supabase/functions/daily-forklift-international-sync/index.ts</code></p>
+
+<hr>
+
+<h3>6. sync-advertisements</h3>
+<p><strong>Purpose:</strong> General advertisement sync</p>
+<p><strong>Trigger:</strong> Manual or scheduled</p>
+<p><strong>File:</strong> <code>supabase/functions/sync-advertisements/index.ts</code></p>
+
+<hr>
+
+<h3>7. send-bid-invitation</h3>
+<p><strong>Purpose:</strong> Email bid invitations to dealers</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> Email API (Resend/SendGrid)</p>
+<p><strong>File:</strong> <code>supabase/functions/send-bid-invitation/index.ts</code></p>
+
+<hr>
+
+<h3>8. bulk-offer-to-dealers</h3>
+<p><strong>Purpose:</strong> Send offers to multiple dealers</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> Email API</p>
+<p><strong>File:</strong> <code>supabase/functions/bulk-offer-to-dealers/index.ts</code></p>
+
+<hr>
+
+<h3>9. create-dealer-account</h3>
+<p><strong>Purpose:</strong> Create Supabase auth account for dealer</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> Supabase Admin API</p>
+<p><strong>Security:</strong> Service role required</p>
+<p><strong>File:</strong> <code>supabase/functions/create-dealer-account/index.ts</code></p>
+
+<hr>
+
+<h3>10. import-marktdata</h3>
+<p><strong>Purpose:</strong> Bulk import market data from CSV</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> CSV parsing</p>
+<p><strong>File:</strong> <code>supabase/functions/import-marktdata/index.ts</code></p>
+
+<hr>
+
+<h3>11. scrape-mascus</h3>
+<p><strong>Purpose:</strong> Web scraping for market data</p>
+<p><strong>Trigger:</strong> Manual via UI</p>
+<p><strong>Technology:</strong> HTTP fetch + HTML parsing</p>
+<p><strong>File:</strong> <code>supabase/functions/scrape-mascus/index.ts</code></p>
+
+<hr>
+
+<h3>12. extract-pdf-data</h3>
+<p><strong>Purpose:</strong> General PDF data extraction</p>
+<p><strong>Trigger:</strong> API call</p>
+<p><strong>Technology:</strong> PDF.js</p>
+<p><strong>File:</strong> <code>supabase/functions/extract-pdf-data/index.ts</code></p>
+
+<hr>
+
+<h3>13. fetch-fx-rates</h3>
+<p><strong>Purpose:</strong> Get currency exchange rates</p>
+<p><strong>Trigger:</strong> On-demand or scheduled</p>
+<p><strong>Note:</strong> Not actively used, prepared for multi-currency support</p>
+<p><strong>File:</strong> <code>supabase/functions/fetch-fx-rates/index.ts</code></p>
+
+<hr>
+
+<h3>14. delete-user</h3>
+<p><strong>Purpose:</strong> Safely delete user accounts</p>
+<p><strong>Trigger:</strong> Admin action</p>
+<p><strong>File:</strong> <code>supabase/functions/delete-user/index.ts</code></p>
+
+<hr>
+
+<h3>15. update-user</h3>
+<p><strong>Purpose:</strong> Update user profile and auth</p>
+<p><strong>Trigger:</strong> Admin/Manager action</p>
+<p><strong>File:</strong> <code>supabase/functions/update-user/index.ts</code></p>
+
+<hr>
+
+<h3>16. create-test-users</h3>
+<p><strong>Purpose:</strong> Development testing</p>
+<p><strong>Trigger:</strong> Manual</p>
+<p><strong>File:</strong> <code>supabase/functions/create-test-users/index.ts</code></p>
+
+<hr>
+
+<h3>17. reset-test-passwords</h3>
+<p><strong>Purpose:</strong> Reset test user passwords</p>
+<p><strong>Trigger:</strong> Manual</p>
+<p><strong>File:</strong> <code>supabase/functions/reset-test-passwords/index.ts</code></p>
+
+<hr>
+
+<h2>7. External Integrations</h2>
+
+<h3>1. Mascus API</h3>
+<p><strong>Type:</strong> Equipment marketplace</p>
+<p><strong>Authentication:</strong> API key</p>
+<p><strong>Status:</strong> Active, some silent failures</p>
+
+<hr>
+
+<h3>2. Forklift International API</h3>
+<p><strong>Type:</strong> Forklift marketplace</p>
+<p><strong>Authentication:</strong> API key + Secret</p>
+<p><strong>Rate Limits:</strong> 30 photos per listing</p>
+<p><strong>Status:</strong> Active, field mapping incomplete</p>
+
+<hr>
+
+<h3>3. OpenAI API</h3>
+<p><strong>Type:</strong> AI services</p>
+<p><strong>Authentication:</strong> API key</p>
+<p><strong>Models Used:</strong> gpt-4o (vision + text)</p>
+<p><strong>Cost:</strong> ~$0.005 per 1K tokens (input), ~$0.015 per 1K tokens (output)</p>
+<p><strong>Status:</strong> Active</p>
+
+<hr>
+
+<h3>4. OpenStreetMap / Leaflet</h3>
+<p><strong>Type:</strong> Mapping</p>
+<p><strong>Authentication:</strong> None (public)</p>
+<p><strong>Status:</strong> Active</p>
+
+<hr>
+
+<h3>5. Email Service (Resend/SendGrid)</h3>
+<p><strong>Type:</strong> Email delivery</p>
+<p><strong>Authentication:</strong> API key</p>
+<p><strong>Status:</strong> Configuration needed (not fully implemented)</p>
+
+<hr>
+
+<h2>8. Incomplete Features &amp; Technical Debt</h2>
+
+<h3>High Priority</h3>
+
+<h4>1. HTTP Request Queue Null URL Bug</h4>
+<p><strong>Issue:</strong> <code>http_request_queue</code> table sometimes has null URLs</p>
+<p><strong>Impact:</strong> Failed publications, no retry</p>
+<p><strong>Location:</strong> Mascus publication flow</p>
+<p><strong>Fix Required:</strong> Add validation, debug insertion points</p>
+
+<h4>2. Forklift International Field Mapping</h4>
+<p><strong>Issue:</strong> Incomplete mapping for ECH and Reachstackers</p>
+<p><strong>Impact:</strong> Ads missing specifications</p>
+<p><strong>Location:</strong> <code>publish-to-forklift-international</code> function</p>
+<p><strong>Fix Required:</strong> Complete field mapping per equipment type</p>
+
+<h4>3. AI Photo Categorization Accuracy</h4>
+<p><strong>Issue:</strong> ~85% accuracy, some categories confused</p>
+<p><strong>Impact:</strong> Manual recategorization needed</p>
+<p><strong>Location:</strong> <code>sort-photos-with-ai</code> function</p>
+<p><strong>Fix Required:</strong> Better prompts, few-shot examples, model fine-tuning</p>
+
+<h4>4. Price Suggestion Algorithm</h4>
+<p><strong>Issue:</strong> Basic matching, no ML, no confidence intervals</p>
+<p><strong>Impact:</strong> Poor suggestions for rare equipment</p>
+<p><strong>Location:</strong> <code>src/utils/priceSuggestion.ts</code></p>
+<p><strong>Fix Required:</strong> Implement proper ML model, more data points, weighted scoring</p>
+
+<h4>5. Email Service Integration</h4>
+<p><strong>Issue:</strong> Email functions exist but no service configured</p>
+<p><strong>Impact:</strong> No automated emails sent</p>
+<p><strong>Fix Required:</strong> Configure Resend or SendGrid, add templates</p>
+
+<h4>6. Dealer Portal Limitations</h4>
+<p><strong>Issue:</strong> Limited functionality, no self-service</p>
+<p><strong>Impact:</strong> Manual work for dealer management</p>
+<p><strong>Fix Required:</strong> Add profile management, communication tools, analytics</p>
+
+<hr>
+
+<h3>Medium Priority</h3>
+
+<h4>7. Multi-Language Incomplete</h4>
+<p><strong>Issue:</strong> Not all screens/components translated</p>
+<p><strong>Impact:</strong> Mixed language experience</p>
+
+<h4>8. Publication Error Handling</h4>
+<p><strong>Issue:</strong> Silent failures, no user notification</p>
+<p><strong>Impact:</strong> Users don't know publication failed</p>
+
+<h4>9. Analytics Dashboard</h4>
+<p><strong>Issue:</strong> No business intelligence beyond basic counts</p>
+<p><strong>Impact:</strong> No insights into sales trends, dealer performance</p>
+
+<h4>10. Maintenance Document Workflow</h4>
+<p><strong>Issue:</strong> No batch processing, limited extraction formats</p>
+<p><strong>Impact:</strong> Slow document processing</p>
+
+<h4>11. Customer Portal Features</h4>
+<p><strong>Issue:</strong> Basic display only, no interaction</p>
+<p><strong>Impact:</strong> Limited customer engagement</p>
+
+<h4>12. Bid Management Tools</h4>
+<p><strong>Issue:</strong> No comparison, no expiration, limited tracking</p>
+<p><strong>Impact:</strong> Manual bid management</p>
+
+<hr>
+
+<h3>Low Priority</h3>
+
+<h4>13. Web Scraping Sources</h4>
+<p><strong>Issue:</strong> Only Mascus, manual trigger</p>
+
+<h4>14. Search Performance</h4>
+<p><strong>Issue:</strong> No full-text search, basic SQL LIKE queries</p>
+
+<h4>15. File Size Limits</h4>
+<p><strong>Issue:</strong> Hardcoded limits, no compression</p>
+
+<h4>16. Video Processing</h4>
+<p><strong>Issue:</strong> No transcoding, large files</p>
+
+<h4>17. Backup System</h4>
+<p><strong>Issue:</strong> Manual backup via script</p>
+
+<h4>18. Testing</h4>
+<p><strong>Issue:</strong> No automated tests</p>
+
+<h4>19. Error Logging</h4>
+<p><strong>Issue:</strong> Console logs only, no centralized logging</p>
+
+<h4>20. API Documentation</h4>
+<p><strong>Issue:</strong> No API docs for internal APIs</p>
+
+<hr>
+
+<h2>9. Known Issues</h2>
+
+<h3>Critical</h3>
+
+<p><span class="error">1. HTTP Queue Null URLs</span></p>
+<ul>
+    <li>Status: Unresolved</li>
+    <li>Frequency: Occasional</li>
+    <li>Workaround: Manual database cleanup</li>
+</ul>
+
+<p><span class="error">2. Mascus Silent Failures</span></p>
+<ul>
+    <li>Status: Investigating</li>
+    <li>Frequency: ~10% of publications</li>
+    <li>Workaround: Manual republish</li>
+</ul>
+
+<h3>Major</h3>
+
+<p><span class="warning">3. AI Photo Sort Wrong Categories</span></p>
+<ul>
+    <li>Status: Known limitation</li>
+    <li>Frequency: ~15% of photos</li>
+    <li>Workaround: Manual override</li>
+</ul>
+
+<p><span class="warning">4. FI Field Mapping Incomplete</span></p>
+<ul>
+    <li>Status: Documented</li>
+    <li>Impact: Missing specs in FI ads</li>
+    <li>Workaround: Manual edit in FI dashboard</li>
+</ul>
+
+<p><span class="warning">5. Price Suggestions Off</span></p>
+<ul>
+    <li>Status: Algorithm needs improvement</li>
+    <li>Frequency: ~30% inaccurate</li>
+    <li>Workaround: Manual override</li>
+</ul>
+
+<h3>Minor</h3>
+
+<p>6. <strong>Mixed Language UI</strong> - Translations incomplete</p>
+<p>7. <strong>Search Slow with 1000+ Dossiers</strong> - Need indexing improvements</p>
+<p>8. <strong>Email Functions Not Configured</strong> - Needs email service setup</p>
+<p>9. <strong>No Mobile Responsiveness</strong> - Desktop-first design</p>
+<p>10. <strong>Large File Upload Failures</strong> - No chunking implemented</p>
+
+<hr>
+
+<h2>10. Development Setup</h2>
+
+<h3>Prerequisites</h3>
+<ul>
+    <li>Node.js 18+</li>
+    <li>npm or yarn</li>
+    <li>Supabase account</li>
+    <li>OpenAI API key (for AI features)</li>
+</ul>
+
+<h3>Environment Variables</h3>
+<p>Create <code>.env</code> file:</p>
+<pre>
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+</pre>
+
+<h3>Installation</h3>
+<pre>npm install</pre>
+
+<h3>Development</h3>
+<pre>npm run dev</pre>
+
+<h3>Build</h3>
+<pre>npm run build</pre>
+
+<h3>Type Checking</h3>
+<pre>npm run typecheck</pre>
+
+<h3>Linting</h3>
+<pre>npm run lint</pre>
+
+<hr>
+
+<h2>Database Migrations</h2>
+
+<p>All migrations are in <code>supabase/migrations/</code></p>
+
+<p><strong>Important:</strong> Run migrations in order by timestamp.</p>
+
+<h3>Initial Setup</h3>
+<ol>
+    <li>Create Supabase project</li>
+    <li>Run all migrations sequentially</li>
+    <li>Set up storage buckets</li>
+    <li>Configure RLS policies</li>
+</ol>
+
+<h3>Migration Strategy</h3>
+<ul>
+    <li>Never edit existing migrations</li>
+    <li>Create new migration for changes</li>
+    <li>Test in development first</li>
+    <li>Use descriptive filenames</li>
+    <li>Include rollback instructions</li>
+</ul>
+
+<hr>
+
+<h2>Deployment</h2>
+
+<h3>Frontend</h3>
+<ul>
+    <li>Build with <code>npm run build</code></li>
+    <li>Deploy <code>dist/</code> folder to hosting</li>
+    <li>Configure environment variables</li>
+</ul>
+
+<h3>Edge Functions</h3>
+<ul>
+    <li>Deploy via Supabase CLI or API</li>
+    <li>Use provided MCP tools</li>
+    <li>Configure secrets in Supabase dashboard</li>
+</ul>
+
+<h3>Database</h3>
+<ul>
+    <li>Migrations auto-applied in Supabase</li>
+    <li>Or use Supabase CLI: <code>supabase db push</code></li>
+</ul>
+
+<hr>
+
+<h2>Security Considerations</h2>
+
+<h3>Implemented</h3>
+<ul>
+    <li><span class="check">✅</span> Row Level Security on all tables</li>
+    <li><span class="check">✅</span> Service role for admin functions</li>
+    <li><span class="check">✅</span> Authenticated-only write access</li>
+    <li><span class="check">✅</span> Public read policies for customer portal</li>
+    <li><span class="check">✅</span> Secure credential storage</li>
+    <li><span class="check">✅</span> Password hashing (Supabase Auth)</li>
+</ul>
+
+<h3>Missing</h3>
+<ul>
+    <li><span class="error">❌</span> API rate limiting</li>
+    <li><span class="error">❌</span> File upload virus scanning</li>
+    <li><span class="error">❌</span> SQL injection protection testing</li>
+    <li><span class="error">❌</span> XSS protection audit</li>
+    <li><span class="error">❌</span> CSRF tokens</li>
+    <li><span class="error">❌</span> Content Security Policy headers</li>
+    <li><span class="error">❌</span> Security audit</li>
+</ul>
+
+<hr>
+
+<h2>Performance Optimization Needs</h2>
+
+<h3>Database</h3>
+<ul>
+    <li>Add indexes for search columns</li>
+    <li>Implement full-text search</li>
+    <li>Optimize complex queries</li>
+    <li>Add materialized views for dashboards</li>
+</ul>
+
+<h3>Frontend</h3>
+<ul>
+    <li>Code splitting</li>
+    <li>Lazy loading</li>
+    <li>Image optimization</li>
+    <li>Bundle size reduction (currently 2.3MB)</li>
+</ul>
+
+<h3>Edge Functions</h3>
+<ul>
+    <li>Response caching</li>
+    <li>Concurrent processing</li>
+    <li>Batch operations</li>
+    <li>Connection pooling</li>
+</ul>
+
+<hr>
+
+<h2>Future Enhancements (Wishlist)</h2>
+
+<h3>Phase 1 - Core Improvements</h3>
+<ol>
+    <li>Complete AI photo categorization training</li>
+    <li>Fix HTTP queue null URL bug</li>
+    <li>Complete Forklift International mapping</li>
+    <li>Implement email service</li>
+    <li>Add proper error logging</li>
+</ol>
+
+<h3>Phase 2 - Feature Completion</h3>
+<ol>
+    <li>Build comprehensive analytics</li>
+    <li>Enhance dealer portal</li>
+    <li>Add customer inquiry system</li>
+    <li>Implement bid comparison tools</li>
+    <li>Add automated testing</li>
+</ol>
+
+<h3>Phase 3 - Scale &amp; Performance</h3>
+<ol>
+    <li>Implement full-text search</li>
+    <li>Add caching layer</li>
+    <li>Optimize database queries</li>
+    <li>Implement CDN for media</li>
+    <li>Add mobile app</li>
+</ol>
+
+<h3>Phase 4 - Advanced Features</h3>
+<ol>
+    <li>Machine learning price predictions</li>
+    <li>Automated market reports</li>
+    <li>Integration with more marketplaces</li>
+    <li>API for third-party integrations</li>
+    <li>Multi-tenant support</li>
+</ol>
+
+<hr>
+
+<h2>Contact &amp; Support</h2>
+
+<p>For technical questions or issues, contact the development team.</p>
+
+<p><strong>Internal Documentation:</strong></p>
+<ul>
+    <li>See <code>/project/*.md</code> files for specific module documentation</li>
+    <li>Database schema: Check migration files</li>
+    <li>API endpoints: See edge function files</li>
+</ul>
+
+<hr>
+
+<h2>Appendices</h2>
+
+<h3>A. File Structure</h3>
+<pre>
+project/
+├── src/
+│   ├── components/     # React components
+│   ├── pages/          # Page components
+│   ├── contexts/       # React contexts
+│   ├── lib/            # Supabase client
+│   ├── utils/          # Utilities
+│   └── main.tsx        # Entry point
+├── supabase/
+│   ├── functions/      # Edge functions
+│   └── migrations/     # DB migrations
+├── public/             # Static assets
+├── backup-script/      # Database backup
+└── *.md               # Documentation
+</pre>
+
+<h3>B. Key Dependencies</h3>
+<ul>
+    <li><code>@supabase/supabase-js</code> - Supabase client</li>
+    <li><code>react</code> - UI framework</li>
+    <li><code>jspdf</code> - PDF generation</li>
+    <li><code>xlsx</code> - Excel export</li>
+    <li><code>leaflet</code> - Maps</li>
+    <li><code>lucide-react</code> - Icons</li>
+    <li><code>pdf-lib</code> - PDF manipulation</li>
+</ul>
+
+<h3>C. Naming Conventions</h3>
+<ul>
+    <li><strong>Database:</strong> snake_case</li>
+    <li><strong>TypeScript:</strong> camelCase</li>
+    <li><strong>Components:</strong> PascalCase</li>
+    <li><strong>Files:</strong> PascalCase for components, camelCase for utils</li>
+    <li><strong>Dossier Numbers:</strong> HCL26-XXX format</li>
+</ul>
+
+<hr>
+
+<div style="margin-top: 40pt; padding-top: 20pt; border-top: 2pt solid #0066cc;">
+    <p><strong>Document Version:</strong> 1.0</p>
+    <p><strong>Generated:</strong> February 10, 2026</p>
+    <p><strong>Status:</strong> Living Document - Update as features change</p>
+</div>
+
+</body>
+</html>
