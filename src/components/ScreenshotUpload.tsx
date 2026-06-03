@@ -1,5 +1,18 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, FileText } from 'lucide-react';
+import { Upload, X, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, FileText, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+
+interface UploadAttempt {
+  attempt: number;
+  error: string;
+  type: string; // 'network' | 'storage' | 'database' | 'unknown'
+  timestamp: string;
+}
+
+interface UploadErrorEntry {
+  filename: string;
+  filesize: number;
+  attempts: UploadAttempt[];
+}
 import { supabase } from '../lib/supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -41,6 +54,8 @@ export function ScreenshotUpload({ onDataExtracted, equipmentType, onScreenshotC
   const [uploadedFiles, setUploadedFiles] = useState<Map<string, File>>(new Map());
   const [currentPdfFile, setCurrentPdfFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadErrorLog, setUploadErrorLog] = useState<UploadErrorEntry[]>([]);
+  const [errorLogExpanded, setErrorLogExpanded] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
@@ -448,21 +463,36 @@ export function ScreenshotUpload({ onDataExtracted, equipmentType, onScreenshotC
     }
   };
 
-  const uploadPhotoFile = async (file: File, dossierId: string): Promise<boolean> => {
+  const classifyError = (err: any): { message: string; type: string } => {
+    const msg = err?.message || err?.toString() || 'Onbekende fout';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch')) {
+      return { message: msg, type: 'network' };
+    }
+    if (err?.statusCode || err?.status) {
+      return { message: `HTTP ${err.statusCode || err.status}: ${msg}`, type: 'storage' };
+    }
+    if (msg.includes('duplicate') || msg.includes('violates') || msg.includes('unique')) {
+      return { message: msg, type: 'database' };
+    }
+    return { message: msg, type: 'unknown' };
+  };
+
+  const uploadPhotoFile = async (file: File, dossierId: string): Promise<{ success: boolean; errorEntry?: UploadErrorEntry }> => {
     // Validate file size (minimum 100 bytes, maximum 5MB)
     if (file.size < 100) {
       console.error(`Bestand te klein (${file.size} bytes), wordt overgeslagen: ${file.name}`);
-      return false;
+      return { success: false, errorEntry: { filename: file.name, filesize: file.size, attempts: [{ attempt: 0, error: `Bestand te klein (${file.size} bytes)`, type: 'validation', timestamp: new Date().toISOString() }] } };
     }
 
     if (file.size > 5 * 1024 * 1024) {
       console.error(`Bestand te groot (${file.size} bytes), wordt overgeslagen: ${file.name}`);
-      return false;
+      return { success: false, errorEntry: { filename: file.name, filesize: file.size, attempts: [{ attempt: 0, error: `Bestand te groot (${(file.size / 1024 / 1024).toFixed(1)}MB, max 5MB)`, type: 'validation', timestamp: new Date().toISOString() }] } };
     }
 
     const maxRetries = 3;
     const fileExt = file.name.split('.').pop() || 'jpg';
     const fileName = `${dossierId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const attemptLog: UploadAttempt[] = [];
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -499,18 +529,24 @@ export function ScreenshotUpload({ onDataExtracted, equipmentType, onScreenshotC
         if (dbError) throw dbError;
 
         console.log(`✓ Upload succesvol: ${file.name}`);
-        return true;
+        return { success: true };
       } catch (err) {
+        const classified = classifyError(err);
         console.error(`Upload poging ${attempt} mislukt voor ${file.name}:`, err);
+        attemptLog.push({
+          attempt,
+          error: classified.message,
+          type: classified.type,
+          timestamp: new Date().toISOString(),
+        });
         if (attempt < maxRetries) {
-          // Wait before retrying: 1s, 2s, 3s
           await new Promise(resolve => setTimeout(resolve, attempt * 1000));
         }
       }
     }
 
     console.error(`✗ Upload definitief mislukt na ${maxRetries} pogingen: ${file.name}`);
-    return false;
+    return { success: false, errorEntry: { filename: file.name, filesize: file.size, attempts: attemptLog } };
   };
 
   const analyzeHTML = async (htmlContent: string, file: File, uploadedFiles: Map<string, File> = new Map()) => {
@@ -592,11 +628,22 @@ Extraheer de informatie en geef het resultaat als een JSON object.`
 
           if (imageFiles.length > 0) {
             setPhotosMessage(`${imageFiles.length} foto's gevonden, bezig met uploaden...`);
+            setUploadErrorLog([]);
 
             let uploadedCount = 0;
+            const errorEntries: UploadErrorEntry[] = [];
             for (const imageFile of imageFiles) {
-              const success = await uploadPhotoFile(imageFile, dossierId);
-              if (success) uploadedCount++;
+              const result = await uploadPhotoFile(imageFile, dossierId);
+              if (result.success) {
+                uploadedCount++;
+              } else if (result.errorEntry) {
+                errorEntries.push(result.errorEntry);
+              }
+            }
+
+            if (errorEntries.length > 0) {
+              setUploadErrorLog(errorEntries);
+              setErrorLogExpanded(false);
             }
 
             setPhotosMessage(`${uploadedCount} van ${imageFiles.length} foto's succesvol geüpload!`);
@@ -1222,6 +1269,52 @@ Geef het resultaat als een JSON object met EXACT deze veldnamen:`;
                 <div className="flex items-center gap-3 text-red-600">
                   <AlertCircle className="w-5 h-5" />
                   <span className="text-sm font-medium">{error}</span>
+                </div>
+              )}
+
+              {uploadErrorLog.length > 0 && (
+                <div className="mt-2 border border-red-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setErrorLogExpanded(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-2 bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {uploadErrorLog.length} foto{uploadErrorLog.length !== 1 ? "'s" : ''} mislukt — klik voor details
+                    </span>
+                    {errorLogExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+
+                  {errorLogExpanded && (
+                    <div className="bg-white p-3 space-y-3 max-h-72 overflow-y-auto text-xs font-mono">
+                      <button
+                        onClick={() => {
+                          const lines = uploadErrorLog.map(e => {
+                            const attemptLines = e.attempts.map(a =>
+                              `  poging ${a.attempt} [${a.timestamp}] (${a.type}): ${a.error}`
+                            ).join('\n');
+                            return `${e.filename} (${(e.filesize / 1024).toFixed(1)} KB)\n${attemptLines}`;
+                          }).join('\n\n');
+                          const header = `Upload error log — ${new Date().toLocaleString('nl-NL')}\nURL: ${window.location.href}\nUser-Agent: ${navigator.userAgent}\n\n`;
+                          navigator.clipboard.writeText(header + lines);
+                        }}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mb-2"
+                      >
+                        <Copy className="w-3 h-3" /> Kopieer log voor support
+                      </button>
+
+                      {uploadErrorLog.map((entry, i) => (
+                        <div key={i} className="border-l-2 border-red-300 pl-3">
+                          <div className="font-semibold text-gray-800">{entry.filename} <span className="text-gray-400 font-normal">({(entry.filesize / 1024).toFixed(1)} KB)</span></div>
+                          {entry.attempts.map((a, j) => (
+                            <div key={j} className={`mt-1 ${a.type === 'network' ? 'text-orange-600' : a.type === 'storage' ? 'text-red-600' : a.type === 'database' ? 'text-purple-600' : 'text-gray-600'}`}>
+                              poging {a.attempt} — <span className="bg-gray-100 px-1 rounded">{a.type}</span> — {a.error}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
