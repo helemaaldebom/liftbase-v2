@@ -449,52 +449,68 @@ export function ScreenshotUpload({ onDataExtracted, equipmentType, onScreenshotC
   };
 
   const uploadPhotoFile = async (file: File, dossierId: string): Promise<boolean> => {
-    try {
-      // Validate file size (minimum 100 bytes, maximum 5MB)
-      if (file.size < 100) {
-        console.error(`Bestand te klein (${file.size} bytes), wordt overgeslagen: ${file.name}`);
-        return false;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        console.error(`Bestand te groot (${file.size} bytes), wordt overgeslagen: ${file.name}`);
-        return false;
-      }
-
-      console.log(`Uploaden: ${file.name} (${file.size} bytes)`);
-
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${dossierId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('dossier-photos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { error: dbError } = await supabase
-        .from('photos')
-        .insert({
-          dossier_id: dossierId,
-          storage_path: fileName,
-          filename: file.name,
-          file_size_bytes: file.size,
-          step_key: 'dossier',
-          display_order: 0,
-          quality_passed: true,
-        });
-
-      if (dbError) throw dbError;
-
-      console.log(`✓ Upload succesvol: ${file.name}`);
-      return true;
-    } catch (err) {
-      console.error('Upload error:', err);
+    // Validate file size (minimum 100 bytes, maximum 5MB)
+    if (file.size < 100) {
+      console.error(`Bestand te klein (${file.size} bytes), wordt overgeslagen: ${file.name}`);
       return false;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      console.error(`Bestand te groot (${file.size} bytes), wordt overgeslagen: ${file.name}`);
+      return false;
+    }
+
+    const maxRetries = 3;
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${dossierId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Uploaden: ${file.name} (${file.size} bytes) — poging ${attempt}/${maxRetries}`);
+
+        const { error: uploadError } = await supabase.storage
+          .from('dossier-photos')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          // File already exists — treat as success (previous attempt succeeded)
+          if (uploadError.message?.includes('already exists') || (uploadError as any).statusCode === '409') {
+            console.log(`✓ Bestand bestaat al (eerder geüpload): ${file.name}`);
+          } else {
+            throw uploadError;
+          }
+        }
+
+        const { error: dbError } = await supabase
+          .from('photos')
+          .insert({
+            dossier_id: dossierId,
+            storage_path: fileName,
+            filename: file.name,
+            file_size_bytes: file.size,
+            step_key: 'dossier',
+            display_order: 0,
+            quality_passed: true,
+          });
+
+        if (dbError) throw dbError;
+
+        console.log(`✓ Upload succesvol: ${file.name}`);
+        return true;
+      } catch (err) {
+        console.error(`Upload poging ${attempt} mislukt voor ${file.name}:`, err);
+        if (attempt < maxRetries) {
+          // Wait before retrying: 1s, 2s, 3s
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        }
+      }
+    }
+
+    console.error(`✗ Upload definitief mislukt na ${maxRetries} pogingen: ${file.name}`);
+    return false;
   };
 
   const analyzeHTML = async (htmlContent: string, file: File, uploadedFiles: Map<string, File> = new Map()) => {
