@@ -157,8 +157,8 @@ export function CustomerSelector({ value, customerId, onChange, disabled = false
         // This is a customer name from a dossier - don't pass a customer_id
         realCustomerId = null;
       } else if (selectedId.startsWith('user_')) {
-        // This is an eindgebruiker - extract the user ID
-        realCustomerId = selectedId.replace('user_', '');
+        // Eindgebruiker without a customers record — no FK-safe customer_id available
+        realCustomerId = null;
       } else {
         // This is a real customer ID from the customers table
         realCustomerId = selectedId;
