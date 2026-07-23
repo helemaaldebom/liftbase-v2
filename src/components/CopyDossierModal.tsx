@@ -489,8 +489,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
 
           <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
             <p className="text-sm">
-              Alle gegevens worden gekopieerd. Geef eventueel een nieuwe titel op en maak het dossier aan —
-              de overige velden pas je daarna in het dossier zelf aan. Het serienummer wordt automatisch gegenereerd.
+              Alle gegevens worden gekopieerd. Geef eventueel een nieuwe titel op en maak het dossier aan.
+              De overige velden pas je daarna in het dossier zelf aan. Het serienummer wordt automatisch gegenereerd.
             </p>
           </div>
 
