@@ -427,7 +427,7 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
             tire_size_front: details.tire_size_front || '',
             tire_size_back: details.tire_size_back || '',
             central_greasing_chassis: details.central_greasing_chassis || false,
-            fifth_wheel_height: details.fifth_wheel_height || null,
+            fifth_wheel_height_mm: details.fifth_wheel_height_mm || null,
           })
           .select();
           if (detailsError) {
@@ -489,8 +489,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
 
           <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
             <p className="text-sm">
-              Alle gegevens zijn gekopieerd. Je kunt ze nog aanpassen voordat het nieuwe dossier wordt aangemaakt.
-              Het serienummer wordt automatisch gegenereerd.
+              Alle gegevens worden gekopieerd. Geef eventueel een nieuwe titel op en maak het dossier aan —
+              de overige velden pas je daarna in het dossier zelf aan. Het serienummer wordt automatisch gegenereerd.
             </p>
           </div>
 
@@ -510,6 +510,10 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
             />
           </div>
 
+          {/* Overige velden zijn verborgen tijdens kopiëren — alle gegevens worden
+              wel meegekopieerd en zijn na aanmaken in het dossier zelf aan te passen. */}
+          {false && (
+          <>
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
               {t('dossiers.description')}
@@ -911,6 +915,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
               />
             </div>
           </div>
+          </>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <button
