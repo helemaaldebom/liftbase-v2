@@ -201,6 +201,10 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
           };
           console.log('Inserting forklift_details directly:', updateData);
 
+          // Verwijder de (lege) rij die de DB-trigger al aanmaakte, zodat er geen
+          // duplicaat ontstaat (duplicaten breken .maybeSingle() in PDF en formulier).
+          await supabase.from('forklift_details').delete().eq('dossier_id', newDossier.id);
+
           const { error: detailsError, data: insertResult } = await supabase
             .from('forklift_details')
             .insert({
@@ -237,6 +241,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
             : dossier.ech_details;
 
           if (details) {
+            await supabase.from('empty_container_handler_details').delete().eq('dossier_id', newDossier.id);
+
             const { error: detailsError } = await supabase.from('empty_container_handler_details')
             .insert({
             dossier_id: newDossier.id,
@@ -306,6 +312,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
             : dossier.reachstacker_details;
 
           if (details) {
+            await supabase.from('reachstacker_details').delete().eq('dossier_id', newDossier.id);
+
             const { error: detailsError } = await supabase.from('reachstacker_details')
             .insert({
             dossier_id: newDossier.id,
@@ -376,6 +384,8 @@ export function CopyDossierModal({ dossier, onClose, onSuccess }: CopyDossierMod
             : dossier.terminal_tractor_details;
 
           if (details) {
+            await supabase.from('terminal_tractor_details').delete().eq('dossier_id', newDossier.id);
+
             const { error: detailsError } = await supabase.from('terminal_tractor_details')
             .insert({
             dossier_id: newDossier.id,

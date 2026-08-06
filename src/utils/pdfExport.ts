@@ -587,6 +587,26 @@ function addFooter(doc: jsPDF, logoDataUrl?: string) {
   }
 }
 
+// Een DB-trigger maakt automatisch een (lege) details-rij aan bij het aanmaken
+// van een dossier; het kopiëren van een dossier kan daarnaast een tweede, gevulde
+// rij toevoegen. .maybeSingle() geeft bij meerdere rijen null terug, waardoor de
+// specificaties volledig wegvallen. Haal daarom alle rijen op en kies de rij met
+// de meeste ingevulde velden.
+async function fetchDetailsRow(table: string, dossierId: string): Promise<any | null> {
+  const { data } = await supabase.from(table).select('*').eq('dossier_id', dossierId);
+  if (!data || data.length === 0) return null;
+  if (data.length === 1) return data[0];
+  const score = (r: any) =>
+    Object.entries(r).filter(
+      ([k, v]) =>
+        v !== null &&
+        v !== '' &&
+        v !== false &&
+        !['id', 'dossier_id', 'created_at', 'updated_at'].includes(k)
+    ).length;
+  return data.reduce((best, r) => (score(r) > score(best) ? r : best), data[0]);
+}
+
 export async function generateDossierPDF(dossierId: string, language: Language = 'nl') {
   try {
     console.log('=== START PDF GENERATION ===');
@@ -616,29 +636,13 @@ export async function generateDossierPDF(dossierId: string, language: Language =
 
     console.log('Dossier loaded:', dossier.dossier_number);
 
-    const { data: forkliftDetails } = await supabase
-      .from('forklift_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const forkliftDetails = await fetchDetailsRow('forklift_details', dossierId);
 
-    const { data: echDetails } = await supabase
-      .from('empty_container_handler_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const echDetails = await fetchDetailsRow('empty_container_handler_details', dossierId);
 
-    const { data: reachstackerDetails } = await supabase
-      .from('reachstacker_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const reachstackerDetails = await fetchDetailsRow('reachstacker_details', dossierId);
 
-    const { data: terminalTractorDetails } = await supabase
-      .from('terminal_tractor_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const terminalTractorDetails = await fetchDetailsRow('terminal_tractor_details', dossierId);
 
     const { data: photos } = await supabase
       .from('photos')
@@ -1061,29 +1065,13 @@ export async function generateExternalDossierPDF(dossierId: string, language: La
     if (dossierError) throw dossierError;
     if (!dossier) throw new Error('Dossier niet gevonden');
 
-    const { data: forkliftDetails } = await supabase
-      .from('forklift_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const forkliftDetails = await fetchDetailsRow('forklift_details', dossierId);
 
-    const { data: echDetails } = await supabase
-      .from('empty_container_handler_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const echDetails = await fetchDetailsRow('empty_container_handler_details', dossierId);
 
-    const { data: reachstackerDetails } = await supabase
-      .from('reachstacker_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const reachstackerDetails = await fetchDetailsRow('reachstacker_details', dossierId);
 
-    const { data: terminalTractorDetails } = await supabase
-      .from('terminal_tractor_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const terminalTractorDetails = await fetchDetailsRow('terminal_tractor_details', dossierId);
 
     const { data: photos } = await supabase
       .from('photos')
@@ -1493,29 +1481,13 @@ export async function generateCleanExternalPDF(dossierId: string, language: Lang
     if (dossierError) throw dossierError;
     if (!dossier) throw new Error('Dossier niet gevonden');
 
-    const { data: forkliftDetails } = await supabase
-      .from('forklift_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const forkliftDetails = await fetchDetailsRow('forklift_details', dossierId);
 
-    const { data: echDetails } = await supabase
-      .from('empty_container_handler_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const echDetails = await fetchDetailsRow('empty_container_handler_details', dossierId);
 
-    const { data: reachstackerDetails } = await supabase
-      .from('reachstacker_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const reachstackerDetails = await fetchDetailsRow('reachstacker_details', dossierId);
 
-    const { data: terminalTractorDetails } = await supabase
-      .from('terminal_tractor_details')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .maybeSingle();
+    const terminalTractorDetails = await fetchDetailsRow('terminal_tractor_details', dossierId);
 
     const { data: photos } = await supabase
       .from('photos')
