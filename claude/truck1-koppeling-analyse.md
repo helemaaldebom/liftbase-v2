@@ -22,16 +22,29 @@
   Video via YouTube-URL.
 - Eenheden metrisch (kg/mm), datums YYYY-MM-DD, booleans als 1.
 
-## Nog onbekend (staat in Truck1API.pdf — kon niet automatisch gelezen worden)
+## Transportmechanisme (uit Truck1API.pdf)
 
-- Transportmechanisme (endpoint/FTP/feed-URL), authenticatie
-- Update-/verwijderflow (vermoedelijk op `imp_id`)
-- Aanleverfrequentie en encoding-eisen
+- **Endpoint:** `POST http://www.truck1.eu/-service/API`
+  Content-type `application/x-www-form-urlencoded` met twee velden:
+  `provider` (provider-key, door Truck1 verstrekt) en `data` (JSON).
+- **JSON-structuur:** `{"test":"1"?, "dealers": {"<dealer_id>": {"<ad_id>":
+  {"action":"add|update|delete", ...velden...}}}}` — ad_id = ons
+  dossiernummer. `add` = volledige data; `update` = alleen gewijzigde velden;
+  `delete` = alleen de action.
+- **Ingebouwde testmodus:** `"test":"1"` → niets wordt echt geplaatst.
+- **Antwoord:** JSON met per dealer `summary` ("add":"10/11" = 10 van 11
+  gelukt) + error/warning-arrays. Bij drukte: "API is busy. Try again later"
+  → retry inbouwen.
+- **Voorraad opvragen:** lege dealer-object sturen → antwoord bevat `stock`
+  met alle online advertenties (imp_id, Truck1-id, link). Perfect voor
+  reconciliatie (welke advertenties staan er echt online).
 
 ## Vereisten vooraf
 
-- Dealeraccount bij Truck1 + via **Truck1-support**: `loc_id`
-  (locatie-ID's van de dealer) en `contact_person_id`(s) opvragen.
+- **Provider-key** aanvragen bij Truck1 (wij worden "provider").
+- Dealeraccount van HCL bij Truck1, gekoppeld aan die provider
+  ("Only stocks of the dealers that are bound to the provider are allowed").
+- Dealer-ID + via Truck1-support: `loc_id` en `contact_person_id`.
 
 ## Mascus — let op
 
