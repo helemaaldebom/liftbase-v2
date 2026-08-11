@@ -35,6 +35,14 @@ Bron: officiële xmlinterface.zip (FORKLIFT-API.pdf, demo-XML's, uploadscripts).
    ("import-currency") — bij bouwen verifiëren wat het account gebruikt.
    Afbeeldingen: aangeraden max 1920×1080.
 
+## BESLUIT Tigran (11-08): GEEN doorplaatsing via F.I.
+
+Tigran wil niet via F.I. doorkoppelen naar Mascus/SupraLift: als hij met F.I.
+stopt (waarschijnlijk, minste traffic) verliest hij anders ook die kanalen.
+Dus: `expmascus=0`, `expsupralift=0`, en per platform een eigen rechtstreekse
+koppeling. Mascus wordt een apart traject (±2–3 d zodra dealeraccount +
+interface-toegang geregeld is). SupraLift vervalt volledig (besluit Tigran).
+
 ## Benodigde gegevens (extern)
 
 - machinelist code + API-username + upload-wachtwoord (F.I.-vertegenwoordiger)
