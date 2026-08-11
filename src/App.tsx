@@ -80,16 +80,79 @@ function SubmitBidRedirect() {
   return <LoadingScreen />;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * /dossiers/:key — accepteert zowel een dossiernummer (HCL26-140) als een UUID.
+ * UUID-links (o.a. vanuit de app zelf en oude gedeelde links) worden automatisch
+ * herschreven naar het leesbare dossiernummer.
+ */
 function DossierDetailRoute() {
-  const { id } = useParams();
+  const { key } = useParams();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const onNavigate = useAppNavigate();
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? 'dossiers';
-  if (!id) return <Navigate to="/" replace />;
+  const state = (location.state as { returnTo?: string; dossierId?: string } | null) ?? {};
+  const returnTo = state.returnTo ?? 'dossiers';
+  const isUuid = !!key && UUID_RE.test(key);
+  const [resolvedId, setResolvedId] = useState<string | null>(
+    isUuid ? key! : state.dossierId ?? null
+  );
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setFailed(false);
+    if (!key) { setFailed(true); return; }
+
+    if (UUID_RE.test(key)) {
+      setResolvedId(key);
+      // URL verfraaien: UUID → dossiernummer (id via state meegeven, scheelt een query)
+      (async () => {
+        const { data } = await supabase
+          .from('dossiers')
+          .select('dossier_number')
+          .eq('id', key)
+          .maybeSingle();
+        const nr = (data as { dossier_number?: string | null } | null)?.dossier_number;
+        if (active && nr) {
+          navigate(`/dossiers/${encodeURIComponent(nr)}${location.search}`, {
+            replace: true,
+            state: { ...state, dossierId: key },
+          });
+        }
+      })();
+    } else if (state.dossierId) {
+      setResolvedId(state.dossierId);
+    } else {
+      // Dossiernummer opzoeken (case-insensitief)
+      (async () => {
+        const { data, error } = await supabase
+          .from('dossiers')
+          .select('id')
+          .ilike('dossier_number', key)
+          .limit(1);
+        if (!active) return;
+        const row = (data as { id: string }[] | null)?.[0];
+        if (error || !row) {
+          console.error('Dossier niet gevonden voor nummer:', key, error);
+          setFailed(true);
+        } else {
+          setResolvedId(row.id);
+        }
+      })();
+    }
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  if (failed) return <Navigate to="/dossiers" replace />;
+  if (!resolvedId) return <LoadingScreen />;
   return (
     <DossierDetailPage
-      dossierId={id}
+      key={resolvedId}
+      dossierId={resolvedId}
       bidId={searchParams.get('bid')}
       onNavigate={onNavigate}
       returnTo={returnTo}
@@ -141,7 +204,7 @@ function App() {
           <Routes>
             {/* Publiek bereikbaar (biedingsflow voor externe partijen) */}
             <Route path="/submit-bid/:bidId" element={<SubmitBidRedirect />} />
-            <Route path="/dossiers/:id" element={<DossierDetailRoute />} />
+            <Route path="/dossiers/:key" element={<DossierDetailRoute />} />
 
             {/* Ingelogde omgeving */}
             <Route path="/" element={<RequireAuth><DashboardRoute /></RequireAuth>} />
