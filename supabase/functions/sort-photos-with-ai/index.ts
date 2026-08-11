@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const { signedURL } = await signedUrlResponse.json();
-      return { id: photo.id, url: `${supabaseUrl}${signedURL}` };
+      return { id: photo.id, url: `${supabaseUrl}/storage/v1${signedURL}` };
     }));
 
     // De AI werkt met compacte fotonummers (1..N) i.p.v. UUID's.
