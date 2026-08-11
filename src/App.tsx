@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { useAppNavigate, type NavigateFn } from './lib/navigation';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DossiersPage } from './pages/DossiersPage';
@@ -18,222 +20,147 @@ import { DealerDossierViewPage } from './pages/DealerDossierViewPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
 import MaintenanceManagementPage from './pages/MaintenanceManagementPage';
 
-type Page = 'dashboard' | 'dossiers' | 'dossier-detail' | 'dealers' | 'biedingen' | 'marktdata-invoeren' | 'marktdata-database' | 'marktdata-import' | 'settings' | 'publicatie-dashboard' | 'dealer-dashboard' | 'dealer-dossier' | 'customer-portal' | 'maintenance-management';
-
-function AppContent() {
-  const { user, profile, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>(() => {
-    const saved = sessionStorage.getItem('currentPage');
-    return (saved as Page) || 'dashboard';
-  });
-  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(() => {
-    return sessionStorage.getItem('selectedDossierId') || null;
-  });
-  const [selectedBidId, setSelectedBidId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest');
-  const [marktdataEquipmentType, setMarktdataEquipmentType] = useState<string | null>(null);
-  const [editMarktdataDossierId, setEditMarktdataDossierId] = useState<string | null>(null);
-  const [returnToPage, setReturnToPage] = useState<Page>(() => {
-    const saved = sessionStorage.getItem('returnToPage');
-    return (saved as Page) || 'dossiers';
-  });
-
-  useEffect(() => {
-    sessionStorage.setItem('currentPage', currentPage);
-  }, [currentPage]);
-
-  useEffect(() => {
-    if (selectedDossierId) {
-      sessionStorage.setItem('selectedDossierId', selectedDossierId);
-    } else {
-      sessionStorage.removeItem('selectedDossierId');
-    }
-  }, [selectedDossierId]);
-
-  useEffect(() => {
-    sessionStorage.setItem('returnToPage', returnToPage);
-  }, [returnToPage]);
-
-  useEffect(() => {
-    const path = window.location.pathname;
-    const submitBidMatch = path.match(/^\/submit-bid\/([a-f0-9-]+)$/);
-    const dealerDossierMatch = path.match(/^\/dealer\/dossier\/([a-f0-9-]+)$/);
-
-    if (submitBidMatch) {
-      const bidId = submitBidMatch[1];
-      setSelectedBidId(bidId);
-      loadDossierFromBid(bidId);
-    } else if (dealerDossierMatch) {
-      const dossierId = dealerDossierMatch[1];
-      setSelectedDossierId(dossierId);
-      setCurrentPage('dealer-dossier');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (profile?.dealer_id) {
-      const savedPage = sessionStorage.getItem('currentPage');
-      if (!savedPage || savedPage === 'dashboard') {
-        setCurrentPage('dealer-dashboard');
-      }
-    }
-  }, [profile]);
-
-  const loadDossierFromBid = async (bidId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('bids')
-        .select('dossier_id')
-        .eq('id', bidId)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data) {
-        setSelectedDossierId(data.dossier_id);
-        setCurrentPage('dossier-detail');
-      }
-    } catch (error) {
-      console.error('Error loading bid:', error);
-    }
-  };
-
-  const handleNavigate = (
-    page: string,
-    id?: string,
-    filter?: string,
-    equipmentType?: string,
-    marktdataDossierId?: string,
-    dossierFilters?: {
-      statusFilter?: string;
-      equipmentTypeFilter?: string;
-      searchTerm?: string;
-      dateSort?: 'newest' | 'oldest';
-    }
-  ) => {
-    if (page === 'dossier-detail') {
-      setReturnToPage(currentPage);
-    }
-    setCurrentPage(page as Page);
-    if (id) {
-      setSelectedDossierId(id);
-    }
-    if (filter) {
-      setStatusFilter(filter);
-    } else if (page !== 'dossiers') {
-      setStatusFilter('all');
-    }
-    if (equipmentType) {
-      setMarktdataEquipmentType(equipmentType);
-    } else {
-      setMarktdataEquipmentType(null);
-    }
-    if (marktdataDossierId) {
-      setEditMarktdataDossierId(marktdataDossierId);
-    } else {
-      setEditMarktdataDossierId(null);
-    }
-    if (dossierFilters) {
-      if (dossierFilters.statusFilter !== undefined) {
-        setStatusFilter(dossierFilters.statusFilter);
-      }
-      if (dossierFilters.equipmentTypeFilter !== undefined) {
-        setEquipmentTypeFilter(dossierFilters.equipmentTypeFilter);
-      }
-      if (dossierFilters.searchTerm !== undefined) {
-        setSearchTerm(dossierFilters.searchTerm);
-      }
-      if (dossierFilters.dateSort !== undefined) {
-        setDateSort(dossierFilters.dateSort);
-      }
-    }
-  };
-
-  if (currentPage === 'dossier-detail' && selectedDossierId) {
-    return <DossierDetailPage dossierId={selectedDossierId} bidId={selectedBidId} onNavigate={handleNavigate} returnTo={returnToPage} />;
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Laden...</p>
-        </div>
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-slate-600">Laden...</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  if (!user) {
-    return <LoginPage />;
-  }
+/** Toont LoginPage voor niet-ingelogde gebruikers (zelfde gedrag als voorheen: geen redirect, de URL blijft staan). */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <LoginPage />;
+  return <>{children}</>;
+}
 
-  if (currentPage === 'dossiers') {
-    return (
-      <DossiersPage
-        onNavigate={handleNavigate}
-        initialStatusFilter={statusFilter}
-        initialEquipmentTypeFilter={equipmentTypeFilter}
-        initialSearchTerm={searchTerm}
-        initialDateSort={dateSort}
-      />
-    );
-  }
+/** Kleine helper voor pagina's die alleen onNavigate nodig hebben. */
+function NavPage({ component: C }: { component: ComponentType<{ onNavigate: NavigateFn }> }) {
+  const onNavigate = useAppNavigate();
+  return <C onNavigate={onNavigate} />;
+}
 
-  if (currentPage === 'dealers') {
-    return <DealersPage onNavigate={handleNavigate} />;
-  }
+/** Oude biedingslink /submit-bid/:bidId — dossier opzoeken en doorsturen. */
+function SubmitBidRedirect() {
+  const { bidId } = useParams();
+  const navigate = useNavigate();
+  const [failed, setFailed] = useState(false);
 
-  if (currentPage === 'biedingen') {
-    return <BiedingenPage onNavigate={handleNavigate} />;
-  }
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('bids')
+          .select('dossier_id')
+          .eq('id', bidId as string)
+          .maybeSingle();
+        if (error) throw error;
+        if (!active) return;
+        const bid = data as { dossier_id: string } | null;
+        if (bid) {
+          navigate(`/dossiers/${bid.dossier_id}?bid=${bidId}`, { replace: true });
+        } else {
+          setFailed(true);
+        }
+      } catch (error) {
+        console.error('Error loading bid:', error);
+        if (active) setFailed(true);
+      }
+    })();
+    return () => { active = false; };
+  }, [bidId, navigate]);
 
-  if (currentPage === 'marktdata-invoeren') {
-    return <MarktdataInvoerenPage onNavigate={handleNavigate} initialEquipmentType={marktdataEquipmentType} editDossierId={editMarktdataDossierId} />;
-  }
+  if (failed) return <Navigate to="/" replace />;
+  return <LoadingScreen />;
+}
 
-  if (currentPage === 'marktdata-database') {
-    return <MarktdataDatabasePage onNavigate={handleNavigate} />;
-  }
+function DossierDetailRoute() {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const onNavigate = useAppNavigate();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? 'dossiers';
+  if (!id) return <Navigate to="/" replace />;
+  return (
+    <DossierDetailPage
+      dossierId={id}
+      bidId={searchParams.get('bid')}
+      onNavigate={onNavigate}
+      returnTo={returnTo}
+    />
+  );
+}
 
-  if (currentPage === 'marktdata-import') {
-    return <MarktdataImportPage onNavigate={handleNavigate} />;
-  }
+function DossiersRoute() {
+  const [searchParams] = useSearchParams();
+  const onNavigate = useAppNavigate();
+  return (
+    <DossiersPage
+      key={searchParams.toString()}
+      onNavigate={onNavigate}
+      initialStatusFilter={searchParams.get('status') ?? 'all'}
+      initialEquipmentTypeFilter={searchParams.get('type') ?? 'all'}
+      initialSearchTerm={searchParams.get('q') ?? ''}
+      initialDateSort={(searchParams.get('sort') as 'newest' | 'oldest') ?? 'newest'}
+    />
+  );
+}
 
-  if (currentPage === 'settings') {
-    return <SettingsPage onNavigate={handleNavigate} />;
-  }
+function MarktdataInvoerenRoute() {
+  const [searchParams] = useSearchParams();
+  const onNavigate = useAppNavigate();
+  return (
+    <MarktdataInvoerenPage
+      key={searchParams.toString()}
+      onNavigate={onNavigate}
+      initialEquipmentType={searchParams.get('type')}
+      editDossierId={searchParams.get('edit')}
+    />
+  );
+}
 
-  if (currentPage === 'publicatie-dashboard') {
-    return <PublicationDashboardPage onNavigate={handleNavigate} />;
-  }
-
-  if (currentPage === 'dealer-dashboard') {
-    return <DealerDashboardPage />;
-  }
-
-  if (currentPage === 'dealer-dossier' && selectedDossierId) {
-    return <DealerDossierViewPage />;
-  }
-
-  if (currentPage === 'customer-portal') {
-    return <CustomerPortalPage />;
-  }
-
-  if (currentPage === 'maintenance-management') {
-    return <MaintenanceManagementPage onNavigate={handleNavigate} />;
-  }
-
-  return <DashboardPage onNavigate={handleNavigate} />;
+/** Dealers landen op hun eigen dashboard i.p.v. het interne dashboard. */
+function DashboardRoute() {
+  const { profile } = useAuth();
+  const onNavigate = useAppNavigate();
+  if (profile?.dealer_id) return <Navigate to="/dealer-dashboard" replace />;
+  return <DashboardPage onNavigate={onNavigate} />;
 }
 
 function App() {
   return (
     <AuthProvider>
       <LanguageProvider>
-        <AppContent />
+        <BrowserRouter>
+          <Routes>
+            {/* Publiek bereikbaar (biedingsflow voor externe partijen) */}
+            <Route path="/submit-bid/:bidId" element={<SubmitBidRedirect />} />
+            <Route path="/dossiers/:id" element={<DossierDetailRoute />} />
+
+            {/* Ingelogde omgeving */}
+            <Route path="/" element={<RequireAuth><DashboardRoute /></RequireAuth>} />
+            <Route path="/dossiers" element={<RequireAuth><DossiersRoute /></RequireAuth>} />
+            <Route path="/dealers" element={<RequireAuth><NavPage component={DealersPage} /></RequireAuth>} />
+            <Route path="/biedingen" element={<RequireAuth><NavPage component={BiedingenPage} /></RequireAuth>} />
+            <Route path="/marktdata/invoeren" element={<RequireAuth><MarktdataInvoerenRoute /></RequireAuth>} />
+            <Route path="/marktdata/database" element={<RequireAuth><NavPage component={MarktdataDatabasePage} /></RequireAuth>} />
+            <Route path="/marktdata/import" element={<RequireAuth><NavPage component={MarktdataImportPage} /></RequireAuth>} />
+            <Route path="/settings" element={<RequireAuth><NavPage component={SettingsPage} /></RequireAuth>} />
+            <Route path="/publicatie" element={<RequireAuth><NavPage component={PublicationDashboardPage} /></RequireAuth>} />
+            <Route path="/dealer-dashboard" element={<RequireAuth><DealerDashboardPage /></RequireAuth>} />
+            <Route path="/dealer/dossier/:id" element={<RequireAuth><DealerDossierViewPage /></RequireAuth>} />
+            <Route path="/customer-portal" element={<RequireAuth><CustomerPortalPage /></RequireAuth>} />
+            <Route path="/maintenance" element={<RequireAuth><NavPage component={MaintenanceManagementPage} /></RequireAuth>} />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
       </LanguageProvider>
     </AuthProvider>
   );

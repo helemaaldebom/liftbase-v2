@@ -26,10 +26,7 @@ echo ""
 
 # ─── 2. Bouwen ───────────────────────────────────────────────────────────────
 echo "▶ Bouwen..."
-if [ ! -d node_modules ] || [ ! -x node_modules/.bin/vite ]; then
-  echo "  node_modules ontbreekt — npm install draaien (eenmalig)..."
-  npm install
-fi
+npm install --no-audit --no-fund --silent
 set -a; source "$DIR/.env.test"; set +a
 npm run build
 [ -f dist/index.html ] || { echo "  ✗ FOUT: dist/index.html ontbreekt, build mislukt."; exit 1; }
