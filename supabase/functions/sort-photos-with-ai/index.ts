@@ -13,12 +13,11 @@ interface Photo {
   display_order: number;
 }
 
+const MAX_PHOTOS = 100;
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -30,11 +29,8 @@ Deno.serve(async (req: Request) => {
 
     if (!dossierId) {
       return new Response(
-        JSON.stringify({ error: 'dossierId is required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'dossierId is verplicht' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -50,26 +46,34 @@ Deno.serve(async (req: Request) => {
 
     if (!photosResponse.ok) {
       const errorText = await photosResponse.text();
-      console.error('Failed to fetch photos:', {
-        status: photosResponse.status,
-        statusText: photosResponse.statusText,
-        body: errorText
-      });
-      throw new Error(`Failed to fetch photos: ${photosResponse.status} - ${errorText}`);
+      console.error('Failed to fetch photos:', photosResponse.status, errorText);
+      throw new Error(`Foto's ophalen mislukt (${photosResponse.status})`);
     }
 
     const photos: Photo[] = await photosResponse.json();
 
     if (!photos || photos.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No photos found' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Geen foto\'s gevonden voor dit dossier' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    if (photos.length === 1) {
+      return new Response(
+        JSON.stringify({ success: true, message: '1 foto, niets te sorteren', order: [photos[0].id] }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (photos.length > MAX_PHOTOS) {
+      return new Response(
+        JSON.stringify({ error: `Te veel foto's (${photos.length}); maximum is ${MAX_PHOTOS}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Signed URLs voor alle foto's
     const photoUrls = await Promise.all(photos.map(async (photo: Photo) => {
       const signedUrlResponse = await fetch(
         `${supabaseUrl}/storage/v1/object/sign/dossier-photos/${photo.storage_path}`,
@@ -85,26 +89,20 @@ Deno.serve(async (req: Request) => {
       );
 
       if (!signedUrlResponse.ok) {
-        throw new Error(`Failed to create signed URL for ${photo.filename}`);
+        throw new Error(`Signed URL aanmaken mislukt voor ${photo.filename}`);
       }
 
       const { signedURL } = await signedUrlResponse.json();
-
-      return {
-        id: photo.id,
-        url: `${supabaseUrl}${signedURL}`,
-        filename: photo.filename,
-      };
+      return { id: photo.id, url: `${supabaseUrl}${signedURL}` };
     }));
 
-    const photoDescriptions = photoUrls.map((p, idx) =>
-      `Photo ${idx + 1} (ID: ${p.id}): ${p.filename}`
-    ).join('\n');
-
-    const imageContent = photoUrls.map(p => ({
-      type: 'image_url',
-      image_url: { url: p.url }
-    }));
+    // De AI werkt met compacte fotonummers (1..N) i.p.v. UUID's.
+    // Daardoor blijft het antwoord klein en kan het nooit afgekapt worden,
+    // en kan de AI geen onbestaande ID's verzinnen.
+    const imageContent = photoUrls.map((p, idx) => ([
+      { type: 'text', text: `Foto ${idx + 1}:` },
+      { type: 'image_url', image_url: { url: p.url, detail: 'low' } },
+    ])).flat();
 
     const messages = [
       {
@@ -112,9 +110,9 @@ Deno.serve(async (req: Request) => {
         content: [
           {
             type: 'text',
-            text: `Je bent een professionele equipment fotograaf die foto's organiseert voor verkoop advertenties van heftrucks/zwaar materieel.
+            text: `Je bent een professionele equipment-fotograaf die foto's organiseert voor verkoopadvertenties van heftrucks en zwaar materieel.
 
-Ik heb ${photos.length} foto's die gesorteerd moeten worden in een professionele volgorde. De ideale volgorde voor equipment foto's is:
+Hieronder staan ${photos.length} genummerde foto's (Foto 1 t/m Foto ${photos.length}). Sorteer ze in deze professionele volgorde:
 1. Hoofdfoto vooraanzicht (volledig voertuig)
 2. Diagonaal voor-links
 3. Diagonaal voor-rechts
@@ -123,20 +121,15 @@ Ik heb ${photos.length} foto's die gesorteerd moeten worden in een professionele
 6. Achteraanzicht
 7. Cabine interieur
 8. Controlepaneel/dashboard
-9. Mast/hefmechanisme (bij heftruck)
-10. Vorken/aanbouwdelen (bij heftruck)
+9. Mast/hefmechanisme
+10. Vorken/aanbouwdelen
 11. Motorcompartiment
 12. Banden/wielen
 13. Detail close-ups (schade, slijtage, typeplaatjes, serienummers)
 14. Overige foto's
 
-BELANGRIJK: Geef ALLEEN een JSON array terug met de foto IDs in de optimale volgorde. Geen extra tekst, geen uitleg, geen markdown formatting.
-
-Foto's om te sorteren:
-${photoDescriptions}
-
-Geef exact dit formaat terug (zonder backticks of andere formatting):
-["foto-id-1", "foto-id-2", "foto-id-3"]`
+Antwoord uitsluitend met een JSON-object in dit formaat, met elk fotonummer precies één keer:
+{"order": [3, 1, 2, ...]}`
           },
           ...imageContent
         ]
@@ -151,137 +144,91 @@ Geef exact dit formaat terug (zonder backticks of andere formatting):
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.3,
+        messages,
+        max_tokens: 2000,
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
       }),
     });
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
       console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+      throw new Error(`AI-service gaf een fout (${openaiResponse.status}). Probeer het later opnieuw.`);
     }
 
     const openaiData = await openaiResponse.json();
-    const aiResponse = openaiData.choices[0].message.content;
-
+    const aiResponse = openaiData.choices?.[0]?.message?.content ?? '';
     console.log('Raw AI response:', aiResponse);
 
-    let jsonString = aiResponse.trim();
-
-    jsonString = jsonString.replace(/```json\n?/g, '');
-    jsonString = jsonString.replace(/```javascript\n?/g, '');
-    jsonString = jsonString.replace(/```\n?/g, '');
-    jsonString = jsonString.trim();
-
-    if (jsonString.startsWith('return ')) {
-      jsonString = jsonString.substring(7);
-    }
-    if (jsonString.endsWith(';')) {
-      jsonString = jsonString.slice(0, -1);
-    }
-
-    const jsonMatch = jsonString.match(/\[[^\]]*\]/);
-    if (!jsonMatch) {
-      console.error('Failed to find JSON array in response');
-      console.error('Cleaned response:', jsonString);
-      console.error('Original response:', aiResponse);
-      throw new Error('Could not parse AI response - no JSON array found. De AI gaf geen geldige JSON array terug.');
-    }
-
-    let sortedIds: string[];
+    let order: unknown;
     try {
-      const jsonToParse = jsonMatch[0];
-      console.log('Attempting to parse:', jsonToParse);
+      const parsed = JSON.parse(aiResponse);
+      order = parsed.order;
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', aiResponse);
+      throw new Error('De AI gaf geen geldig JSON-antwoord. Probeer het opnieuw.');
+    }
 
-      sortedIds = JSON.parse(jsonToParse);
+    if (!Array.isArray(order)) {
+      throw new Error('De AI gaf geen geldige volgorde terug. Probeer het opnieuw.');
+    }
 
-      if (!Array.isArray(sortedIds)) {
-        throw new Error('Parsed result is not an array');
+    // Valideer: alleen geldige nummers 1..N, elk hooguit één keer.
+    const seen = new Set<number>();
+    const validIndexes: number[] = [];
+    for (const value of order) {
+      const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+      if (Number.isInteger(n) && n >= 1 && n <= photos.length && !seen.has(n)) {
+        seen.add(n);
+        validIndexes.push(n);
       }
+    }
 
-      if (sortedIds.some(id => typeof id !== 'string')) {
-        throw new Error('Array contains non-string values');
+    // Ontbrekende foto's achteraan toevoegen in hun huidige volgorde,
+    // zodat er nooit foto's "kwijtraken".
+    for (let i = 1; i <= photos.length; i++) {
+      if (!seen.has(i)) validIndexes.push(i);
+    }
+
+    const sortedIds = validIndexes.map((n) => photos[n - 1].id);
+    console.log(`Sorted ${sortedIds.length} photos (${seen.size} door AI, ${photos.length - seen.size} aangevuld)`);
+
+    // display_order bijwerken
+    const updateResults = await Promise.all(sortedIds.map((photoId, i) =>
+      fetch(`${supabaseUrl}/rest/v1/photos?id=eq.${photoId}&dossier_id=eq.${dossierId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ display_order: i }),
+      })
+    ));
+
+    const failed = updateResults.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      for (const r of failed) {
+        console.error('Update failed:', r.status, await r.text());
       }
-    } catch (parseError: any) {
-      console.error('Failed to parse JSON:', parseError);
-      console.error('JSON string:', jsonMatch[0]);
-      console.error('Original AI response:', aiResponse);
-      throw new Error(`JSON parsing mislukt: ${parseError.message}. De AI response was niet in het juiste formaat.`);
-    }
-
-    if (!Array.isArray(sortedIds)) {
-      throw new Error('AI response is not an array');
-    }
-
-    if (sortedIds.length === 0) {
-      throw new Error('AI response is empty');
-    }
-
-    console.log('Successfully parsed', sortedIds.length, 'photo IDs');
-
-    const updatePromises: Promise<any>[] = [];
-    for (let i = 0; i < sortedIds.length; i = i + 1) {
-      const photoId: string = sortedIds[i];
-      const promise = fetch(
-        `${supabaseUrl}/rest/v1/photos?id=eq.${photoId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({ display_order: i }),
-        }
-      );
-      updatePromises.push(promise);
-    }
-
-    const results = await Promise.all(updatePromises);
-    const errors = results.filter(function(r) { return !r.ok; });
-
-    if (errors.length > 0) {
-      console.error('Errors updating photos:', errors.length, 'failed out of', results.length);
-
-      for (let i = 0; i < errors.length; i = i + 1) {
-        const errorResponse = errors[i];
-        const errorText = await errorResponse.text();
-        console.error(`Error ${i + 1}:`, {
-          status: errorResponse.status,
-          statusText: errorResponse.statusText,
-          body: errorText
-        });
-      }
-
-      throw new Error(`Failed to update ${errors.length} out of ${results.length} photos`);
+      throw new Error(`Opslaan van de nieuwe volgorde is voor ${failed.length} van de ${sortedIds.length} foto's mislukt`);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `${photos.length} photos sorted successfully`,
-        order: sortedIds
+        message: `${photos.length} foto's gesorteerd`,
+        order: sortedIds,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: any) {
     console.error('Error in sort-photos-with-ai:', error);
     return new Response(
-      JSON.stringify({
-        error: error.message || 'Internal server error',
-        details: error.toString()
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: error.message || 'Er ging iets mis bij het sorteren' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
