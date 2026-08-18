@@ -18,58 +18,26 @@ interface PublicationStatus {
 }
 
 const PLATFORMS = [
-  { key: 'forklift_international', label: 'Forklift International', enabled: true },
-  { key: 'mascus', label: 'Mascus', enabled: true },
-  { key: 'trucksnl', label: 'TrucksNL', enabled: false },
-  { key: 'machineseeker', label: 'Machineseeker', enabled: false },
-  { key: 'truckscout24', label: 'TruckScout24', enabled: false },
+  { key: 'hcl', label: 'Eigen website (heavycargolifters.com)', enabled: true, directPublish: true },
+  { key: 'forklift_international', label: 'Forklift International', enabled: true, directPublish: true },
+  { key: 'mascus', label: 'Mascus', enabled: true, directPublish: false, hint: 'via Forklift International' },
+  { key: 'truck1', label: 'Truck1.eu', enabled: false, directPublish: false },
+  { key: 'trucksnl', label: 'TrucksNL', enabled: false, directPublish: false },
+  { key: 'machineseeker', label: 'Machineseeker', enabled: false, directPublish: false },
+  { key: 'truckscout24', label: 'TruckScout24', enabled: false, directPublish: false },
 ];
 
 export function PublicationSection({ dossierId, isManager, onPublicationUpdate }: PublicationSectionProps) {
-  const { t } = useLanguage();
   const [dossier, setDossier] = useState<any>(null);
   const [publications, setPublications] = useState<PublicationStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [showXMLPreview, setShowXMLPreview] = useState<string | null>(null);
-  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
-  const [fiUsername, setFiUsername] = useState('');
-  const [fiPassword, setFiPassword] = useState('');
-  const [storedCredentials, setStoredCredentials] = useState<{username: string; password: string} | null>(null);
 
   useEffect(() => {
     loadData();
-    loadStoredCredentials();
   }, [dossierId]);
-
-  const loadStoredCredentials = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('api_credentials')
-        .select('username, api_key')
-        .eq('platform', 'forklift_international')
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error loading stored credentials:', error);
-        return;
-      }
-
-      if (data) {
-        setStoredCredentials({
-          username: data.username,
-          password: data.api_key
-        });
-        console.log('Loaded stored Forklift International credentials');
-      } else {
-        console.log('No stored credentials found');
-      }
-    } catch (error) {
-      console.error('Error loading stored credentials:', error);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -114,51 +82,36 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
     }
   };
 
+  const PUBLISH_FUNCTIONS: Record<string, string> = {
+    forklift_international: 'publish-to-forklift-international',
+    hcl: 'publish-to-hcl-website',
+  };
+
+  const PLATFORM_LABELS: Record<string, string> = {
+    forklift_international: 'Forklift International',
+    hcl: 'de website',
+  };
+
   const handlePublishNow = async (platform: string) => {
     if (!isManager) return;
-
-    if (platform === 'forklift_international') {
-      if (storedCredentials) {
-        console.log('Using stored credentials for Forklift International');
-        await executePublish(platform, storedCredentials);
-      } else {
-        console.log('No stored credentials, showing modal');
-        setShowCredentialsModal(true);
-      }
-      return;
-    }
-
     await executePublish(platform);
   };
 
-  const executePublish = async (platform: string, credentials?: { username: string; password: string }) => {
+  const executePublish = async (platform: string) => {
+    const functionName = PUBLISH_FUNCTIONS[platform];
+    if (!functionName) return;
+
     setPublishing(platform);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Niet ingelogd');
 
-      if (platform === 'forklift_international') {
-        const equipmentType = dossier?.equipment_type;
-        const supportedTypes = ['forklift', 'heavy_duty_forklift', 'reachstacker', 'terminal_tractor', 'empty_container_handler'];
-        if (!supportedTypes.includes(equipmentType)) {
-          alert(`Dit dossier heeft equipment type "${equipmentType}". Ondersteunde types voor Forklift International: ${supportedTypes.join(', ')}`);
-          setPublishing(null);
-          return;
-        }
+      const supportedTypes = ['forklift', 'heavy_duty_forklift', 'reachstacker', 'terminal_tractor', 'empty_container_handler'];
+      if (!supportedTypes.includes(dossier?.equipment_type)) {
+        alert(`Dit machinetype ("${dossier?.equipment_type}") kan niet gepubliceerd worden.`);
+        setPublishing(null);
+        return;
       }
-
-      const functionName = platform === 'forklift_international'
-        ? 'publish-to-forklift-international'
-        : 'publish-to-mascus';
-
-      const body = platform === 'forklift_international'
-        ? {
-            dossierIds: [dossierId],
-            testMode: false,
-            fiUsername: credentials?.username || '',
-            fiPassword: credentials?.password || ''
-          }
-        : { dossier_id: dossierId };
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`,
@@ -168,72 +121,34 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ dossierIds: [dossierId] }),
         }
       );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Publicatie mislukt');
-      }
 
       const result = await response.json();
       console.log('Publication result:', result);
 
-      const statusCode = result.apiStatusCode || result.uploadResult?.status;
-      let statusEmoji = '';
-      let statusDescription = '';
-
-      if (statusCode === 200) {
-        statusEmoji = '✅';
-        statusDescription = 'Connectie succesvol';
-      } else if (statusCode === 400) {
-        statusEmoji = '❌';
-        statusDescription = 'Bad Request - Controleer XML data';
-      } else if (statusCode === 401) {
-        statusEmoji = '🔒';
-        statusDescription = 'Unauthorized - Verkeerde inloggegevens';
-      } else if (statusCode === 403) {
-        statusEmoji = '⛔';
-        statusDescription = 'Forbidden - Geen toegang';
-      } else if (statusCode === 404) {
-        statusEmoji = '🔍';
-        statusDescription = 'Not Found - API endpoint niet gevonden';
-      } else if (statusCode >= 500) {
-        statusEmoji = '⚠️';
-        statusDescription = 'Server Error - Probleem bij Forklift International';
-      } else if (statusCode >= 300 && statusCode < 400) {
-        statusEmoji = '↪️';
-        statusDescription = 'Redirect';
+      if (!response.ok) {
+        throw new Error(result.error || 'Publicatie mislukt');
       }
 
+      const label = PLATFORM_LABELS[platform] || platform;
       if (result.success) {
-        alert(`${statusEmoji} Succesvol gepubliceerd naar ${platform}!\n\nAPI Status: ${statusCode} - ${statusDescription}\nMachines: ${result.machineCount}\nBericht: ${result.statusMessage || 'OK'}\n\nResponse: ${result.uploadResult?.response || 'Data verzonden'}`);
+        alert(`✅ Succesvol gepubliceerd naar ${label}.`);
       } else {
-        alert(`${statusEmoji} Publicatie naar ${platform} heeft gefaald\n\nAPI Status: ${statusCode} - ${statusDescription}\nFout: ${result.statusMessage || 'Onbekend'}\n\nDetails: ${result.uploadResult?.response || 'Geen details beschikbaar'}`);
+        const details = result.results?.filter((r: any) => !r.success).map((r: any) => `${r.dossier}: ${r.error}`).join('\n')
+          || `Status ${result.dataStatus ?? '?'}${result.dataErrors ? `, ${result.dataErrors} fout(en) gemeld door het platform` : ''}`;
+        alert(`❌ Publicatie naar ${label} is mislukt.\n\n${details}`);
       }
 
       await loadData();
       onPublicationUpdate?.();
     } catch (error: any) {
       console.error('Error publishing:', error);
-      console.error('Full error object:', JSON.stringify(error, null, 2));
-      alert(`Fout bij publiceren naar ${platform}:\n\n${error.message}\n\nCheck de browser console voor meer details.`);
+      alert(`Fout bij publiceren:\n\n${error.message}`);
     } finally {
       setPublishing(null);
     }
-  };
-
-  const handleCredentialsSubmit = async () => {
-    if (!fiUsername || !fiPassword) {
-      alert('Vul alle velden in');
-      return;
-    }
-
-    setShowCredentialsModal(false);
-    await executePublish('forklift_international', { username: fiUsername, password: fiPassword });
-    setFiUsername('');
-    setFiPassword('');
   };
 
   const handleViewXML = async (platform: string) => {
@@ -341,6 +256,12 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
                     </span>
                   )}
 
+                  {canPublish && (platform as any).hint && (
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                      {(platform as any).hint}
+                    </span>
+                  )}
+
                   {pubStatus && (
                     <div className="flex items-center space-x-2 ml-4">
                       {getStatusIcon(pubStatus.status)}
@@ -356,9 +277,9 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
                   )}
                 </div>
 
-                {isEnabled && canPublish && (
+                {isEnabled && canPublish && (platform as any).directPublish && (
                   <div className="flex items-center space-x-2">
-                    {pubStatus?.metadata && (
+                    {(pubStatus as any)?.metadata?.xml_feed && (
                       <button
                         onClick={() => handleViewXML(platform.key)}
                         className="px-3 py-1 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors flex items-center space-x-1"
@@ -420,65 +341,6 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
         </div>
       )}
 
-      {showCredentialsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-800">Forklift International Credentials</h3>
-              <p className="text-sm text-slate-600 mt-1">Geen opgeslagen credentials gevonden</p>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Tip:</strong> Sla je credentials permanent op in <strong>Instellingen → API Credentials</strong> zodat je ze niet elke keer hoeft in te voeren.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={fiUsername}
-                  onChange={(e) => setFiUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Forklift International username"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={fiPassword}
-                  onChange={(e) => setFiPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Forklift International password"
-                />
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-200 flex items-center justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowCredentialsModal(false);
-                  setFiUsername('');
-                  setFiPassword('');
-                }}
-                className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleCredentialsSubmit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Publiceren
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

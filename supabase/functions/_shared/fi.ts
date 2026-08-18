@@ -95,10 +95,11 @@ function generateMachineXML(data: MachineData, opts: { unpublish?: boolean; extr
     ['rental', 0],
     ['viewforklift', visible],
     ['viewuser', visible],
-    // Doorplaatsing naar Mascus: tijdelijk AAN als overbrugging totdat de
-    // directe Mascus-koppeling draait (instelbaar via secret FI_EXPORT_MASCUS,
-    // "1" = aan). SupraLift blijft uit (besluit Tigran).
-    ['expmascus', ['1', 'true'].includes((Deno.env.get('FI_EXPORT_MASCUS') ?? '0').toLowerCase()) ? 1 : 0],
+    // Doorplaatsing naar Mascus: per machine via het Mascus-vinkje in Liftbase,
+    // en alleen zolang de globale schakelaar FI_EXPORT_MASCUS aan staat
+    // (tijdelijke brug totdat de directe Mascus-koppeling draait).
+    // SupraLift blijft uit (besluit Tigran).
+    ['expmascus', (['1', 'true'].includes((Deno.env.get('FI_EXPORT_MASCUS') ?? '0').toLowerCase()) && dossier.publish_to_mascus) ? 1 : 0],
     ['expsupralift', 0],
     ['loccountry', mapLookup(COUNTRY_MAP, dossier.country || dossier.land, 4)],
     ['loccity', escapeXml(dossier.location || dossier.locatie || '')],
