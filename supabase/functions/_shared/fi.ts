@@ -67,7 +67,7 @@ function intVal(...candidates: unknown[]): number {
   return 0;
 }
 
-function generateMachineXML(data: MachineData, opts: { unpublish?: boolean } = {}): string {
+function generateMachineXML(data: MachineData, opts: { unpublish?: boolean; extraTags?: string } = {}): string {
   const { dossier, details } = data;
   const visible = opts.unpublish ? 0 : 1;
 
@@ -103,7 +103,7 @@ function generateMachineXML(data: MachineData, opts: { unpublish?: boolean } = {
   ];
 
   const body = tags.map(([k, v]) => ` <${k}>${v}</${k}>`).join('\n');
-  return `<machine type="1">\n${body}\n</machine>`;
+  return `<machine type="1">\n${body}${opts.extraTags ? '\n' + opts.extraTags : ''}\n</machine>`;
 }
 
 export function generateDataXML(code: string, data: MachineData[], opts: { unpublish?: boolean } = {}): string {
@@ -112,12 +112,14 @@ export function generateDataXML(code: string, data: MachineData[], opts: { unpub
 }
 
 export function generateImageXML(code: string, data: MachineData[], supabaseUrl: string): string {
-  const machines = data.map(({ dossier, photos }) => {
-    const imgs = photos.map((p, i) => {
+  // Conform xmlimagedemo.xml: de beeld-XML bevat de volledige machinevelden
+  // (o.a. manufacturer is verplicht) mét daarachter de image-tags.
+  const machines = data.map((m) => {
+    const imgs = m.photos.map((p, i) => {
       const url = `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`;
       return ` <image pos="${i + 1}">${escapeXml(url)}</image>`;
     }).join('\n');
-    return `<machine type="1">\n <internalno>${toInternalNo(dossier.dossier_number)}</internalno>\n${imgs}\n</machine>`;
+    return generateMachineXML(m, { extraTags: imgs });
   }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<machinelist code="${escapeXml(code)}">\n${machines}\n</machinelist>`;
 }
