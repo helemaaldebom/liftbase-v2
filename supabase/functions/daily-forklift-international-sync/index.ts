@@ -1,142 +1,35 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import {
+  DATA_ENDPOINT, IMAGE_ENDPOINT,
+  generateDataXML, generateImageXML, uploadXML,
+  fetchMachineData, updatePublicationStatus, DETAILS_TABLE, toInternalNo,
+} from "../_shared/fi.ts";
+
+// Dagelijkse Forklift International-sync:
+// 1. Publiceert/actualiseert alle dossiers met publish_to_forklift_international=true
+//    die niet verkocht/gearchiveerd zijn.
+// 2. Haalt advertenties offline (viewforklift=0) waarvan het vinkje uit is gezet
+//    of waarvan het dossier op sold/archived staat.
+// Aanroep: cron met Authorization: Bearer <CRON_SECRET>.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface ForkliftData {
-  dossier: any;
-  details: any;
-  photos: any[];
-}
-
-function generateXML(data: ForkliftData[]): string {
-  const machines = data.map(item => generateMachineXML(item)).join('\n');
-  
-  return `<?xml version="1.0" encoding="utf-8"?>
-<machines>
-${machines}
-</machines>`;
-}
-
-function generateMachineXML(data: ForkliftData): string {
-  const { dossier, details, photos } = data;
-  
-  // Map fuel types to FI codes
-  const fuelTypeMap: Record<string, string> = {
-    'Diesel': 'D',
-    'LPG': 'L',
-    'Gas': 'G',
-    'Elektrisch': 'E',
-    'Electric': 'E',
-    'Hybride': 'H',
-    'Hybrid': 'H'
-  };
-  
-  const fuelType = fuelTypeMap[dossier.fuel_type || ''] || 'D';
-
-  // Generate photos section
-  const photosXML = photos.map((photo, index) => {
-    const url = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/dossier-photos/${photo.storage_path}`;
-    return `    <photo>
-      <url>${escapeXml(url)}</url>
-      <main>${index === 0 ? 'yes' : 'no'}</main>
-    </photo>`;
-  }).join('\n');
-
-  // Build machine XML
-  const xml = `  <machine type="1">
-    <id>${escapeXml(dossier.dossier_number)}</id>
-    <changed>${formatDate(dossier.updated_at)}</changed>
-    <make>${escapeXml(dossier.brand || '')}</make>
-    <model>${escapeXml(dossier.model || '')}</model>
-    <year>${dossier.year || ''}</year>
-    <hours>${dossier.hours || details?.hours_on_clock || ''}</hours>
-    <capacity>${Math.round((dossier.capacity || details?.capacity_kg || 0))}</capacity>
-    <loadcenter>${dossier.load_center || details?.load_center_mm || 500}</loadcenter>
-    <lift>${dossier.lifting_height || details?.lift_height_mm || ''}</lift>
-    <freelift>${dossier.free_lift || 0}</freelift>
-    <mast>${escapeXml(dossier.mast_type || details?.mast_type || '')}</mast>
-    <power>${fuelType}</power>
-    <country>${escapeXml(dossier.country || 'NL')}</country>
-    <city>${escapeXml(dossier.location || '')}</city>
-    <dealerprice>${dossier.handelsprijs || 0}</dealerprice>
-    <customerprice>${dossier.eindklantprijs || 0}</customerprice>
-    <description>${escapeXml(dossier.description || '')}</description>
-${photosXML ? photosXML + '\n' : ''}  </machine>`;
-  
-  return xml;
-}
-
-function escapeXml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-async function uploadToForkliftInternational(xml: string, username: string, password: string): Promise<any> {
-  const auth = btoa(`${username}:${password}`);
-
-  console.log('=== DAILY SYNC: FI API REQUEST ===');
-  console.log('URL: https://importapi.forklift-international.com/import.php');
-  console.log('Username:', username);
-  console.log('XML length:', xml.length, 'characters');
-
-  const response = await fetch('https://importapi.forklift-international.com/import.php', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Content-Type': 'application/xml; charset=utf-8'
-    },
-    body: xml
-  });
-
-  const responseText = await response.text();
-
-  console.log('=== DAILY SYNC: FI API RESPONSE ===');
-  console.log('Status:', response.status);
-  console.log('Status Text:', response.statusText);
-  console.log('Response body:', responseText);
-
-  return {
-    status: response.status,
-    statusText: response.statusText,
-    response: responseText
-  };
-}
+const OFFLINE_STATUSES = ['sold', 'archived'];
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
-    // Verify the request has a valid secret key for cron jobs
-    const authHeader = req.headers.get('Authorization');
-    const cronSecret = Deno.env.get('CRON_SECRET') || 'default-secret';
-    
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      throw new Error('Unauthorized: Invalid cron secret');
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    if (!cronSecret || req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+      throw new Error('Niet geautoriseerd (CRON_SECRET)');
     }
 
     const supabase = createClient(
@@ -144,105 +37,97 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get FI credentials from environment or settings table
+    const machinelistCode = Deno.env.get('FI_MACHINELIST_CODE');
     const fiUsername = Deno.env.get('FI_USERNAME');
     const fiPassword = Deno.env.get('FI_PASSWORD');
-
-    if (!fiUsername || !fiPassword) {
-      throw new Error('Forklift International credentials not configured');
+    if (!machinelistCode || !fiUsername || !fiPassword) {
+      throw new Error('F.I.-secrets ontbreken (FI_MACHINELIST_CODE, FI_USERNAME, FI_PASSWORD)');
     }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
-    // Fetch all active forklift dossiers that should be synced
-    const { data: dossiers, error: dossiersError } = await supabase
+    // 1. Te publiceren: vinkje aan, niet verkocht/gearchiveerd, geen marktdata
+    const { data: toPublish, error: pubError } = await supabase
       .from('dossiers')
       .select('*')
-      .eq('equipment_type', 'forklift')
-      .in('status', ['active', 'published'])
-      .eq('is_marktdata', false);
+      .eq('publish_to_forklift_international', true)
+      .eq('is_marktdata', false)
+      .not('status', 'in', `(${OFFLINE_STATUSES.join(',')})`)
+      .in('equipment_type', Object.keys(DETAILS_TABLE));
+    if (pubError) throw new Error(`Dossiers ophalen mislukt: ${pubError.message}`);
 
-    if (dossiersError) {
-      throw new Error(`Failed to fetch dossiers: ${dossiersError.message}`);
-    }
+    // 2. Offline te halen: eerder gepubliceerd, maar vinkje uit of status sold/archived
+    const { data: published } = await supabase
+      .from('advertisement_publications')
+      .select('dossier_id')
+      .eq('platform', 'forklift_international')
+      .eq('status', 'published');
 
-    if (!dossiers || dossiers.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No forklifts to sync',
-          machineCount: 0
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
+    let toUnpublish: any[] = [];
+    if (published?.length) {
+      const { data: pubDossiers } = await supabase
+        .from('dossiers')
+        .select('*')
+        .in('id', published.map((p: any) => p.dossier_id));
+      toUnpublish = (pubDossiers ?? []).filter((d: any) =>
+        !d.publish_to_forklift_international || OFFLINE_STATUSES.includes(d.status)
       );
     }
 
-    // Fetch forklift details and photos for each dossier
-    const forkliftData: ForkliftData[] = [];
+    const results: Record<string, unknown> = {};
 
-    for (const dossier of dossiers) {
-      // Fetch forklift details
-      const { data: details } = await supabase
-        .from('forklift_details')
-        .select('*')
-        .eq('dossier_id', dossier.id)
-        .maybeSingle();
-
-      // Fetch photos
-      const { data: photos } = await supabase
-        .from('photos')
-        .select('*')
-        .eq('dossier_id', dossier.id)
-        .order('display_order', { ascending: true });
-
-      forkliftData.push({
-        dossier,
-        details,
-        photos: photos || []
-      });
+    // Publiceren/updaten
+    if (toPublish?.length) {
+      const machineData = await fetchMachineData(supabase, toPublish);
+      const dataResult = await uploadXML(DATA_ENDPOINT, generateDataXML(machinelistCode, machineData), fiUsername, fiPassword);
+      let imageResult = null;
+      if (dataResult.ok) {
+        imageResult = await uploadXML(IMAGE_ENDPOINT, generateImageXML(machinelistCode, machineData, supabaseUrl), fiUsername, fiPassword);
+      }
+      const success = dataResult.ok && imageResult?.ok !== false;
+      for (const item of machineData) {
+        await updatePublicationStatus(supabase, item.dossier.id,
+          success ? 'published' : 'failed',
+          success ? null : `Sync: ${dataResult.status} ${dataResult.body.slice(0, 300)}`,
+          {
+            internalno: toInternalNo(item.dossier.dossier_number),
+            action: 'sync-publish',
+            data_response: dataResult.body.slice(0, 1000),
+            photo_count: item.photos.length,
+          });
+      }
+      results.published = { count: machineData.length, ok: success, dataStatus: dataResult.status };
+    } else {
+      results.published = { count: 0 };
     }
 
-    // Generate XML
-    const xml = generateXML(forkliftData);
-
-    // Upload to Forklift International
-    const uploadResult = await uploadToForkliftInternational(xml, fiUsername, fiPassword);
-
-    // Log the sync result
-    console.log(`Daily FI sync completed: ${forkliftData.length} machines, status: ${uploadResult.status}`);
-
-    return new Response(
-      JSON.stringify({
-        success: uploadResult.status === 200,
-        uploadResult,
-        machineCount: forkliftData.length,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
+    // Offline halen
+    if (toUnpublish.length) {
+      const machineData = await fetchMachineData(supabase, toUnpublish);
+      const dataResult = await uploadXML(DATA_ENDPOINT, generateDataXML(machinelistCode, machineData, { unpublish: true }), fiUsername, fiPassword);
+      for (const item of machineData) {
+        await updatePublicationStatus(supabase, item.dossier.id,
+          dataResult.ok ? 'deleted' : 'failed',
+          dataResult.ok ? null : `Unpublish: ${dataResult.status} ${dataResult.body.slice(0, 300)}`,
+          {
+            internalno: toInternalNo(item.dossier.dossier_number),
+            action: 'sync-unpublish',
+            data_response: dataResult.body.slice(0, 1000),
+          });
       }
-    );
+      results.unpublished = { count: machineData.length, ok: dataResult.ok, dataStatus: dataResult.status };
+    } else {
+      results.unpublished = { count: 0 };
+    }
 
-  } catch (error) {
-    console.error('Error in daily-forklift-international-sync:', error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    console.log('Daily FI sync klaar:', JSON.stringify(results));
+    return new Response(JSON.stringify({ success: true, ...results, timestamp: new Date().toISOString() }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
+    console.error('Fout in daily-forklift-international-sync:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Onbekende fout' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
