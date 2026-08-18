@@ -61,8 +61,13 @@ interface Dossier {
 
 interface PublicationDate {
   platform: string;
-  published_at: string;
+  published_at: string | null;
+  status: string;
+  last_synced_at: string | null;
 }
+
+const formatPlatformName = (platform: string) =>
+  platform.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 export function DossierDetailPage({ dossierId, bidId, onNavigate, returnTo = 'dossiers' }: DossierDetailPageProps) {
   const { profile } = useAuth();
@@ -259,13 +264,12 @@ export function DossierDetailPage({ dossierId, bidId, onNavigate, returnTo = 'do
     try {
       const { data, error } = await supabase
         .from('advertisement_publications')
-        .select('platform, published_at')
+        .select('platform, published_at, status, last_synced_at')
         .eq('dossier_id', dossierId)
-        .not('published_at', 'is', null)
         .order('published_at', { ascending: true });
 
       if (error) throw error;
-      setPublicationDates(data || []);
+      setPublicationDates((data || []).filter((p: PublicationDate) => p.published_at || p.status === 'deleted'));
     } catch (error) {
       console.error('Error loading publication dates:', error);
     }
@@ -1170,15 +1174,36 @@ export function DossierDetailPage({ dossierId, bidId, onNavigate, returnTo = 'do
                     </div>
                   </div>
 
-                  {publicationDates.length > 0 && (
+                  {publicationDates.some((p) => p.published_at) && (
                     <div className="flex items-start space-x-3 bg-green-50 p-3 rounded-lg">
                       <Calendar className="w-5 h-5 text-green-600 mt-0.5" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-green-900">Online gezet</p>
-                        {publicationDates.map((pub, index) => (
+                        {publicationDates.filter((p) => p.published_at).map((pub, index) => (
                           <p key={index} className="text-sm text-green-700">
-                            <span className="font-medium capitalize">{pub.platform}</span>:{' '}
-                            {new Date(pub.published_at).toLocaleDateString('nl-NL', {
+                            <span className="font-medium">{formatPlatformName(pub.platform)}</span>:{' '}
+                            {new Date(pub.published_at!).toLocaleDateString('nl-NL', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {publicationDates.some((p) => p.status === 'deleted' && p.last_synced_at) && (
+                    <div className="flex items-start space-x-3 bg-slate-100 p-3 rounded-lg">
+                      <Calendar className="w-5 h-5 text-slate-500 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-700">Offline gehaald</p>
+                        {publicationDates.filter((p) => p.status === 'deleted' && p.last_synced_at).map((pub, index) => (
+                          <p key={index} className="text-sm text-slate-600">
+                            <span className="font-medium">{formatPlatformName(pub.platform)}</span>:{' '}
+                            {new Date(pub.last_synced_at!).toLocaleDateString('nl-NL', {
                               day: 'numeric',
                               month: 'long',
                               year: 'numeric',
