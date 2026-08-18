@@ -13,12 +13,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// Namen exact zoals ze al op de site bestaan (anders ontstaan er duplicaten)
 const CATEGORY_MAP: Record<string, string> = {
   forklift: 'Heavy Duty Forklifts',
   heavy_duty_forklift: 'Heavy Duty Forklifts',
   reachstacker: 'Reachstackers',
-  terminal_tractor: 'Terminal Tractors',
-  empty_container_handler: 'Empty Container Handlers',
+  terminal_tractor: 'Terminal tractor',
+  empty_container_handler: 'Container Handlers',
 };
 
 interface WCConfig { url: string; key: string; secret: string; }
