@@ -156,6 +156,10 @@ export function DossiersPage({
           user_profiles:created_by (
             full_name
           ),
+          customers:customer_id (
+            company_name,
+            contact_person
+          ),
           forklift_details(*),
           ech_details:empty_container_handler_details(*),
           reachstacker_details(*),
@@ -181,6 +185,10 @@ export function DossiersPage({
 
         return {
           ...dossier,
+          // Val terug op de gekoppelde klant (via customer_id) als het losse
+          // customer_name-veld leeg is, zodat lijst/filter/zoeken consistent zijn
+          // met het detailscherm (dat de klant ook via customer_id toont).
+          customer_name: dossier.customer_name || dossier.customers?.company_name || null,
           first_published_at: pubs[0]?.published_at || null,
           photos: visiblePhotos,
         };
