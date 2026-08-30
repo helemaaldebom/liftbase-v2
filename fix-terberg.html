@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fix Terberg Duplicaten</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .log-line {
+      margin: 5px 0;
+    }
+    .success {
+      color: #4ade80;
+    }
+    .error {
+      color: #f87171;
+    }
+    .warning {
+      color: #fbbf24;
+    }
+    .info {
+      color: #60a5fa;
+    }
+    h1 {
+      color: #1e293b;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #64748b;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 Fix Terberg Duplicaten</h1>
+    <p>Dit tool consolideert alle Terberg merk varianten naar één enkele schrijfwijze.</p>
+
+    <div>
+      <button id="checkBtn" onclick="checkDuplicates()">1. Check Duplicaten</button>
+      <button id="fixBtn" onclick="fixDuplicates()" disabled>2. Fix Duplicaten</button>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script type="module">
+    const SUPABASE_URL = 'https://wcjegvxnojzirwxogesj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjamVndnhub2p6aXJ3eG9nZXNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzNjcxODcsImV4cCI6MjA3Njk0MzE4N30.MpQ1FU4Wmc_kbZnevScMay4sALMN1mPN3sbTn5e3sfk';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let foundIssues = false;
+
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      line.textContent = message;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    window.checkDuplicates = async function() {
+      document.getElementById('checkBtn').disabled = true;
+      document.getElementById('log').innerHTML = '';
+      foundIssues = false;
+
+      log('🔍 Starten met checken voor dubbele Terberg entries...', 'info');
+
+      try {
+        log('\n📋 Checken dossiers tabel...', 'info');
+        const { data: dossiersData, error: dossiersError } = await supabase
+          .from('dossiers')
+          .select('id, merk')
+          .not('merk', 'is', null);
+
+        if (dossiersError) {
+          log(`❌ Fout bij ophalen dossiers: ${dossiersError.message}`, 'error');
+        } else {
+          const terbergDossiers = dossiersData.filter(d =>
+            d.merk && d.merk.toLowerCase().includes('terberg')
+          );
+          const uniqueMerken = [...new Set(terbergDossiers.map(d => d.merk))].sort();
+
+          log(`   Gevonden: ${terbergDossiers.length} dossiers met Terberg`, 'info');
+          log(`   Unieke varianten: ${uniqueMerken.join(', ')}`, uniqueMerken.length > 1 ? 'warning' : 'success');
+
+          if (uniqueMerken.length > 1) {
+            foundIssues = true;
+            log(`   ⚠️  PROBLEEM: Er zijn ${uniqueMerken.length} verschillende schrijfwijzes!`, 'warning');
+          }
+        }
+
+        log('\n🚜 Checken terminal_tractor_details tabel...', 'info');
+        const { data: terminalTractorData, error: terminalTractorError } = await supabase
+          .from('terminal_tractor_details')
+          .select('id, brand, dossier_id')
+          .not('brand', 'is', null);
+
+        if (terminalTractorError) {
+          log(`❌ Fout bij ophalen terminal tractor details: ${terminalTractorError.message}`, 'error');
+        } else {
+          const terbergTractors = terminalTractorData.filter(d =>
+            d.brand && d.brand.toLowerCase().includes('terberg')
+          );
+          const uniqueBrands = [...new Set(terbergTractors.map(d => d.brand))].sort();
+
+          log(`   Gevonden: ${terbergTractors.length} terminal tractors met Terberg`, 'info');
+          log(`   Unieke varianten: ${uniqueBrands.join(', ')}`, uniqueBrands.length > 1 ? 'warning' : 'success');
+
+          if (uniqueBrands.length > 1) {
+            foundIssues = true;
+            log(`   ⚠️  PROBLEEM: Er zijn ${uniqueBrands.length} verschillende schrijfwijzes!`, 'warning');
+          }
+        }
+
+        if (foundIssues) {
+          log('\n✅ Check compleet - Problemen gevonden! Klik op "Fix Duplicaten" om op te lossen.', 'warning');
+          document.getElementById('fixBtn').disabled = false;
+        } else {
+          log('\n✅ Check compleet - Geen problemen gevonden!', 'success');
+        }
+
+      } catch (error) {
+        log(`❌ Onverwachte fout: ${error.message}`, 'error');
+      } finally {
+        document.getElementById('checkBtn').disabled = false;
+      }
+    };
+
+    window.fixDuplicates = async function() {
+      if (!foundIssues) {
+        log('⚠️  Voer eerst een check uit!', 'warning');
+        return;
+      }
+
+      document.getElementById('fixBtn').disabled = true;
+      document.getElementById('checkBtn').disabled = true;
+
+      log('\n🔧 Starten met fixen van duplicaten...', 'info');
+
+      try {
+        log('\n📝 Updaten van dossiers...', 'info');
+        const { data: dossiersToUpdate } = await supabase
+          .from('dossiers')
+          .select('id, merk')
+          .not('merk', 'is', null);
+
+        const dossiersNeedingUpdate = dossiersToUpdate?.filter(d =>
+          d.merk && d.merk.toLowerCase().includes('terberg') && d.merk !== 'Terberg'
+        ) || [];
+
+        if (dossiersNeedingUpdate.length > 0) {
+          log(`   ${dossiersNeedingUpdate.length} dossiers moeten worden geüpdatet...`, 'info');
+
+          for (const dossier of dossiersNeedingUpdate) {
+            const { error } = await supabase
+              .from('dossiers')
+              .update({ merk: 'Terberg' })
+              .eq('id', dossier.id);
+
+            if (error) {
+              log(`   ❌ Fout bij updaten dossier ${dossier.id}: ${error.message}`, 'error');
+            }
+          }
+          log(`   ✅ ${dossiersNeedingUpdate.length} dossiers geüpdatet`, 'success');
+        } else {
+          log('   ✅ Geen dossiers te updaten', 'success');
+        }
+
+        log('\n📝 Updaten van terminal tractor details...', 'info');
+        const { data: terminalTractorsToUpdate } = await supabase
+          .from('terminal_tractor_details')
+          .select('id, brand')
+          .not('brand', 'is', null);
+
+        const tractorsNeedingUpdate = terminalTractorsToUpdate?.filter(d =>
+          d.brand && d.brand.toLowerCase().includes('terberg') && d.brand !== 'Terberg'
+        ) || [];
+
+        if (tractorsNeedingUpdate.length > 0) {
+          log(`   ${tractorsNeedingUpdate.length} terminal tractors moeten worden geüpdatet...`, 'info');
+
+          for (const tractor of tractorsNeedingUpdate) {
+            const { error } = await supabase
+              .from('terminal_tractor_details')
+              .update({ brand: 'Terberg' })
+              .eq('id', tractor.id);
+
+            if (error) {
+              log(`   ❌ Fout bij updaten terminal tractor ${tractor.id}: ${error.message}`, 'error');
+            }
+          }
+          log(`   ✅ ${tractorsNeedingUpdate.length} terminal tractors geüpdatet`, 'success');
+        } else {
+          log('   ✅ Geen terminal tractors te updaten', 'success');
+        }
+
+        log('\n🎉 KLAAR! Alle Terberg varianten zijn geconsolideerd naar "Terberg"', 'success');
+        log('   Je kunt deze pagina nu sluiten en de hoofdapplicatie verversen.', 'info');
+
+      } catch (error) {
+        log(`❌ Onverwachte fout: ${error.message}`, 'error');
+      } finally {
+        document.getElementById('checkBtn').disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

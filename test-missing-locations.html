@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Check Missing Locations</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Verkochte Dossiers Zonder Locatie</h1>
+  <div id="results">Laden...</div>
+
+  <script type="module">
+    const SUPABASE_URL = 'https://ouhvgnmxsebomzlcrrvg.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91aHZnbm14c2Vib216bGNycnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg1NjI5NjksImV4cCI6MjA0NDEzODk2OX0.jLgkkzvAhBMPGUy7fJ_OB1oXK0UkEUxrvGGYdZPJ7Mg';
+
+    const { createClient } = supabase;
+    const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function checkMissingLocations() {
+      const resultsDiv = document.getElementById('results');
+
+      try {
+        // Get all sold dossiers
+        const { data: soldDossiers, error: soldError } = await client
+          .from('dossiers')
+          .select('id, dossier_number, title, brand, model, location, latitude, longitude, status')
+          .eq('status', 'sold')
+          .order('dossier_number');
+
+        if (soldError) {
+          resultsDiv.innerHTML = `<p style="color: red;">Error: ${soldError.message}</p>`;
+          return;
+        }
+
+        console.log('All sold dossiers:', soldDossiers);
+
+        const missingLocation = soldDossiers.filter(d => !d.location || d.location.trim() === '');
+        const missingCoordinates = soldDossiers.filter(d => d.location && d.location.trim() !== '' && (!d.latitude || !d.longitude));
+        const hasLocationAndCoordinates = soldDossiers.filter(d => d.location && d.location.trim() !== '' && d.latitude && d.longitude);
+
+        let html = `
+          <h2>Statistieken:</h2>
+          <ul>
+            <li><strong>Totaal verkochte dossiers:</strong> ${soldDossiers.length}</li>
+            <li><strong>Met locatie én coördinaten:</strong> ${hasLocationAndCoordinates.length}</li>
+            <li><strong>Zonder locatie veld:</strong> ${missingLocation.length}</li>
+            <li><strong>Met locatie maar zonder coördinaten:</strong> ${missingCoordinates.length}</li>
+          </ul>
+        `;
+
+        if (missingLocation.length > 0) {
+          html += `<h2>Dossiers zonder locatie veld:</h2><ul>`;
+          missingLocation.forEach(d => {
+            html += `<li><strong>${d.dossier_number}</strong> - ${d.brand} ${d.model}</li>`;
+          });
+          html += `</ul>`;
+        }
+
+        if (missingCoordinates.length > 0) {
+          html += `<h2>Dossiers met locatie maar zonder coördinaten:</h2><ul>`;
+          missingCoordinates.forEach(d => {
+            html += `<li><strong>${d.dossier_number}</strong> - ${d.brand} ${d.model} - Locatie: ${d.location}</li>`;
+          });
+          html += `</ul>`;
+        }
+
+        if (hasLocationAndCoordinates.length > 0) {
+          html += `<h2>Dossiers op de kaart:</h2><ul>`;
+          hasLocationAndCoordinates.forEach(d => {
+            html += `<li><strong>${d.dossier_number}</strong> - ${d.brand} ${d.model} - ${d.location}</li>`;
+          });
+          html += `</ul>`;
+        }
+
+        resultsDiv.innerHTML = html;
+      } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        console.error('Error:', error);
+      }
+    }
+
+    checkMissingLocations();
+  </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test AI Sort</title>
+  <script type="module">
+    async function testAISort() {
+      const dossierId = prompt('Enter dossier ID:');
+      if (!dossierId) return;
+
+      const supabaseUrl = prompt('Enter SUPABASE_URL:');
+      const supabaseKey = prompt('Enter SUPABASE_ANON_KEY:');
+
+      console.log('Testing AI sort with:', { dossierId, supabaseUrl });
+
+      try {
+        const apiUrl = `${supabaseUrl}/functions/v1/sort-photos-with-ai`;
+        console.log('Calling:', apiUrl);
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dossierId }),
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response headers:', [...response.headers.entries()]);
+
+        const text = await response.text();
+        console.log('Response text:', text);
+
+        let data;
+        try {
+          data = JSON.parse(text);
+          console.log('Response JSON:', data);
+        } catch (e) {
+          console.error('Failed to parse JSON:', e);
+        }
+
+        document.getElementById('result').textContent = JSON.stringify({
+          status: response.status,
+          ok: response.ok,
+          text,
+          data
+        }, null, 2);
+
+      } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('result').textContent = 'Error: ' + error.message;
+      }
+    }
+
+    window.testAISort = testAISort;
+  </script>
+</head>
+<body>
+  <h1>Test AI Sort Function</h1>
+  <button onclick="testAISort()">Test AI Sort</button>
+  <pre id="result" style="background: #f5f5f5; padding: 20px; margin-top: 20px;"></pre>
+</body>
+</html>

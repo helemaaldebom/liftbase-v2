@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cleanup Maintenance Documents</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Cleanup Maintenance Documents</h1>
+  <button onclick="cleanupAll()">Clean Everything</button>
+  <div id="output"></div>
+
+  <script>
+    const supabaseUrl = 'https://bvpfcbupzjazhjlimmnl.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2cGZjYnVwemp6emhqbGltbW5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg1NjEwNDIsImV4cCI6MjA0NDEzNzA0Mn0.fEpBBB-vFzHOiVP8rGv38gD8m5pNWbSA0Tyx3nrXvIM';
+    const { createClient } = window.supabase;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    async function cleanupAll() {
+      const output = document.getElementById('output');
+      output.innerHTML = '<p>Starting cleanup...</p>';
+
+      try {
+        // Step 1: Get all documents
+        output.innerHTML += '<p>Step 1: Fetching all maintenance documents...</p>';
+        const { data: docs, error: fetchError } = await supabase
+          .from('maintenance_documents')
+          .select('*');
+
+        if (fetchError) {
+          output.innerHTML += `<p style="color: red;">Error fetching documents: ${fetchError.message}</p>`;
+          return;
+        }
+
+        output.innerHTML += `<p>Found ${docs?.length || 0} documents in database</p>`;
+
+        // Step 2: List all files in storage
+        output.innerHTML += '<p>Step 2: Listing files in storage...</p>';
+        const { data: files, error: listError } = await supabase.storage
+          .from('maintenance-documents')
+          .list('', { limit: 1000 });
+
+        if (listError) {
+          output.innerHTML += `<p style="color: red;">Error listing files: ${listError.message}</p>`;
+        } else {
+          output.innerHTML += `<p>Found ${files?.length || 0} files in storage</p>`;
+
+          // Step 3: Delete all files from storage
+          if (files && files.length > 0) {
+            output.innerHTML += '<p>Step 3: Deleting files from storage...</p>';
+            for (const file of files) {
+              const filePaths = await getAllFilesRecursive(file.name);
+              for (const path of filePaths) {
+                const { error: deleteFileError } = await supabase.storage
+                  .from('maintenance-documents')
+                  .remove([path]);
+
+                if (deleteFileError) {
+                  output.innerHTML += `<p style="color: orange;">Could not delete ${path}: ${deleteFileError.message}</p>`;
+                } else {
+                  output.innerHTML += `<p style="color: green;">Deleted file: ${path}</p>`;
+                }
+              }
+            }
+          }
+        }
+
+        // Step 4: Delete all database records
+        output.innerHTML += '<p>Step 4: Deleting all database records...</p>';
+        const { error: deleteError } = await supabase
+          .from('maintenance_documents')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+        if (deleteError) {
+          output.innerHTML += `<p style="color: red;">Error deleting records: ${deleteError.message}</p>`;
+        } else {
+          output.innerHTML += `<p style="color: green;">All database records deleted!</p>`;
+        }
+
+        // Step 5: Verify cleanup
+        output.innerHTML += '<p>Step 5: Verifying cleanup...</p>';
+        const { data: remainingDocs } = await supabase
+          .from('maintenance_documents')
+          .select('id');
+
+        output.innerHTML += `<p><strong>Remaining documents: ${remainingDocs?.length || 0}</strong></p>`;
+        output.innerHTML += '<p style="color: green; font-weight: bold;">✓ Cleanup complete! Try uploading again.</p>';
+
+      } catch (err) {
+        output.innerHTML += `<p style="color: red;">Unexpected error: ${err.message}</p>`;
+      }
+    }
+
+    async function getAllFilesRecursive(folder) {
+      const paths = [];
+
+      const { data: items } = await supabase.storage
+        .from('maintenance-documents')
+        .list(folder);
+
+      if (!items) return paths;
+
+      for (const item of items) {
+        const fullPath = folder ? `${folder}/${item.name}` : item.name;
+
+        if (item.id) { // It's a file
+          paths.push(fullPath);
+        } else { // It's a folder
+          const subPaths = await getAllFilesRecursive(fullPath);
+          paths.push(...subPaths);
+        }
+      }
+
+      return paths;
+    }
+  </script>
+</body>
+</html>

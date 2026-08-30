@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Maintenance Documents</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Maintenance Documents Debug</h1>
+
+    <div class="section">
+        <h2>Test 1: Count Documents</h2>
+        <button onclick="testCount()">Run Test</button>
+        <pre id="count-result">Click button to run test...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Test 2: Fetch All Documents (No Enrichment)</h2>
+        <button onclick="testFetchRaw()">Run Test</button>
+        <pre id="fetch-raw-result">Click button to run test...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Test 3: Fetch With Customer Join</h2>
+        <button onclick="testFetchWithCustomer()">Run Test</button>
+        <pre id="fetch-customer-result">Click button to run test...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Test 4: Full Enrichment (like the app)</h2>
+        <button onclick="testFullEnrichment()">Run Test</button>
+        <pre id="fetch-full-result">Click button to run test...</pre>
+    </div>
+
+    <script>
+        // Load environment variables
+        const SUPABASE_URL = 'https://mggcacgqmvsfzdvjqzuj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1nZ2NhY2dxbXZzZnpkdmpxenVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg0NjEyNDgsImV4cCI6MjA0NDAzNzI0OH0.Gt-H5jRiEVNBvPJK5L7_GmxUVeAY6o33EAiuqpfY-Kw';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function testCount() {
+            const result = document.getElementById('count-result');
+            result.textContent = 'Running...';
+
+            try {
+                const { count, error } = await supabase
+                    .from('maintenance_documents')
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) throw error;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    count: count
+                }, null, 2);
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message
+                }, null, 2);
+            }
+        }
+
+        async function testFetchRaw() {
+            const result = document.getElementById('fetch-raw-result');
+            result.textContent = 'Running...';
+
+            try {
+                const { data, error } = await supabase
+                    .from('maintenance_documents')
+                    .select('id, file_name, customer_id, uploaded_at')
+                    .order('uploaded_at', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    count: data.length,
+                    documents: data
+                }, null, 2);
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message
+                }, null, 2);
+            }
+        }
+
+        async function testFetchWithCustomer() {
+            const result = document.getElementById('fetch-customer-result');
+            result.textContent = 'Running...';
+
+            try {
+                const { data, error } = await supabase
+                    .from('maintenance_documents')
+                    .select(`
+                        id,
+                        file_name,
+                        customer_id,
+                        uploaded_at,
+                        customers (
+                            company_name
+                        )
+                    `)
+                    .order('uploaded_at', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    count: data.length,
+                    documents: data
+                }, null, 2);
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message,
+                    details: error
+                }, null, 2);
+            }
+        }
+
+        async function testFullEnrichment() {
+            const result = document.getElementById('fetch-full-result');
+            result.textContent = 'Running...';
+
+            try {
+                // Step 1: Fetch documents
+                const { data: documentsData, error: docsError } = await supabase
+                    .from('maintenance_documents')
+                    .select(`
+                        id,
+                        file_name,
+                        uploaded_at,
+                        extraction_status,
+                        match_status,
+                        serial_numbers,
+                        supplier_name,
+                        document_date,
+                        currency,
+                        customer_id,
+                        dossier:dossiers(dossiernummer)
+                    `)
+                    .order('uploaded_at', { ascending: false })
+                    .limit(5);
+
+                if (docsError) throw docsError;
+
+                console.log('Raw documents data:', documentsData);
+
+                // Step 2: Enrich with customer and line items
+                const enrichedDocs = await Promise.all(
+                    documentsData.map(async (doc) => {
+                        try {
+                            // Get line items
+                            const { data: lineItems } = await supabase
+                                .from('maintenance_line_items')
+                                .select('amount_excl_vat')
+                                .eq('document_id', doc.id);
+
+                            const totalAmount = lineItems?.reduce((sum, item) => sum + (item.amount_excl_vat || 0), 0) || 0;
+
+                            // Get customer info
+                            const { data: customerData, error: custError } = await supabase
+                                .from('customers')
+                                .select('company_name')
+                                .eq('id', doc.customer_id)
+                                .maybeSingle();
+
+                            if (custError) {
+                                console.error('Error fetching customer for doc:', doc.id, custError);
+                            }
+
+                            return {
+                                ...doc,
+                                total_amount: totalAmount,
+                                customer: customerData || { company_name: 'Unknown Customer' }
+                            };
+                        } catch (err) {
+                            console.error('Error enriching document:', doc.id, err);
+                            return {
+                                ...doc,
+                                total_amount: 0,
+                                customer: { company_name: 'Unknown Customer' }
+                            };
+                        }
+                    })
+                );
+
+                console.log('Enriched documents:', enrichedDocs);
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    raw_count: documentsData.length,
+                    enriched_count: enrichedDocs.length,
+                    documents: enrichedDocs
+                }, null, 2);
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message,
+                    stack: error.stack
+                }, null, 2);
+            }
+        }
+    </script>
+</body>
+</html>

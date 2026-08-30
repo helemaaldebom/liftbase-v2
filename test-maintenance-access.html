@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Maintenance Access</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; border-radius: 4px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        .step { margin: 10px 0; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>Maintenance Module Access Test</h1>
+
+    <div class="section">
+        <h2>Step 1: Check Current User</h2>
+        <button onclick="checkUser()">Check User & Role</button>
+        <pre id="user-result">Click button to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Check Tables Exist</h2>
+        <button onclick="checkTables()">Check Tables</button>
+        <pre id="tables-result">Click button to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Count Documents (Direct Query)</h2>
+        <button onclick="countDocuments()">Count Documents</button>
+        <pre id="count-result">Click button to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 4: Fetch Documents (Full Query)</h2>
+        <button onclick="fetchDocuments()">Fetch Documents</button>
+        <pre id="fetch-result">Click button to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 5: Check RLS Policies</h2>
+        <button onclick="checkPolicies()">Check Policies</button>
+        <pre id="policies-result">Click button to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 6: Test Query With Auth</h2>
+        <button onclick="testWithAuth()">Test With Current Auth</button>
+        <pre id="auth-result">Click button to check...</pre>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://mggcacgqmvsfzdvjqzuj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1nZ2NhY2dxbXZzZnpkdmpxenVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg0NjEyNDgsImV4cCI6MjA0NDAzNzI0OH0.Gt-H5jRiEVNBvPJK5L7_GmxUVeAY6o33EAiuqpfY-Kw';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function checkUser() {
+            const result = document.getElementById('user-result');
+            result.textContent = 'Checking...';
+
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (sessionError) throw sessionError;
+
+                if (!session) {
+                    result.textContent = 'ERROR: No active session. Please log in first.';
+                    result.parentElement.classList.add('error');
+                    return;
+                }
+
+                const { data: profile, error: profileError } = await supabase
+                    .from('user_profiles')
+                    .select('id, email, role, active')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profileError) throw profileError;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    user_id: session.user.id,
+                    email: session.user.email,
+                    profile: profile
+                }, null, 2);
+                result.parentElement.classList.add('success');
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message,
+                    details: error
+                }, null, 2);
+                result.parentElement.classList.add('error');
+            }
+        }
+
+        async function checkTables() {
+            const result = document.getElementById('tables-result');
+            result.textContent = 'Checking...';
+
+            try {
+                const { data: tables, error } = await supabase.rpc('exec_sql', {
+                    query: `
+                        SELECT table_name
+                        FROM information_schema.tables
+                        WHERE table_schema = 'public'
+                        AND table_name IN ('customers', 'maintenance_documents', 'maintenance_line_items')
+                        ORDER BY table_name
+                    `
+                });
+
+                if (error) {
+                    // If RPC doesn't work, try a simpler test
+                    const { count: docCount, error: docError } = await supabase
+                        .from('maintenance_documents')
+                        .select('*', { count: 'exact', head: true });
+
+                    const { count: custCount, error: custError } = await supabase
+                        .from('customers')
+                        .select('*', { count: 'exact', head: true });
+
+                    result.textContent = JSON.stringify({
+                        success: true,
+                        note: 'RPC not available, tested directly',
+                        maintenance_documents_accessible: !docError,
+                        customers_accessible: !custError,
+                        document_count: docCount,
+                        customer_count: custCount
+                    }, null, 2);
+                    result.parentElement.classList.add('success');
+                } else {
+                    result.textContent = JSON.stringify({
+                        success: true,
+                        tables: tables
+                    }, null, 2);
+                    result.parentElement.classList.add('success');
+                }
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message
+                }, null, 2);
+                result.parentElement.classList.add('error');
+            }
+        }
+
+        async function countDocuments() {
+            const result = document.getElementById('count-result');
+            result.textContent = 'Counting...';
+
+            try {
+                const { count, error } = await supabase
+                    .from('maintenance_documents')
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) throw error;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    total_documents: count,
+                    message: count === 0 ? 'No documents found - might be RLS issue or no data' : `Found ${count} documents`
+                }, null, 2);
+
+                if (count === 0) {
+                    result.parentElement.classList.add('warning');
+                } else {
+                    result.parentElement.classList.add('success');
+                }
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message,
+                    hint: 'This might be an RLS policy issue'
+                }, null, 2);
+                result.parentElement.classList.add('error');
+            }
+        }
+
+        async function fetchDocuments() {
+            const result = document.getElementById('fetch-result');
+            result.textContent = 'Fetching...';
+
+            try {
+                const { data, error } = await supabase
+                    .from('maintenance_documents')
+                    .select(`
+                        id,
+                        file_name,
+                        customer_id,
+                        extraction_status,
+                        match_status,
+                        uploaded_at
+                    `)
+                    .order('uploaded_at', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    count: data.length,
+                    documents: data
+                }, null, 2);
+
+                if (data.length === 0) {
+                    result.parentElement.classList.add('warning');
+                } else {
+                    result.parentElement.classList.add('success');
+                }
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message,
+                    code: error.code,
+                    details: error.details
+                }, null, 2);
+                result.parentElement.classList.add('error');
+            }
+        }
+
+        async function checkPolicies() {
+            const result = document.getElementById('policies-result');
+            result.textContent = 'Checking policies...';
+
+            try {
+                // Try to query pg_policies
+                const { data, error } = await supabase
+                    .rpc('exec_sql', {
+                        query: `
+                            SELECT policyname, cmd, roles
+                            FROM pg_policies
+                            WHERE tablename = 'maintenance_documents'
+                            ORDER BY policyname
+                        `
+                    });
+
+                if (error) {
+                    result.textContent = JSON.stringify({
+                        success: false,
+                        message: 'Cannot query policies directly (expected - need service role)',
+                        error: error.message
+                    }, null, 2);
+                    result.parentElement.classList.add('warning');
+                } else {
+                    result.textContent = JSON.stringify({
+                        success: true,
+                        policies: data
+                    }, null, 2);
+                    result.parentElement.classList.add('success');
+                }
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    message: 'Cannot query policies (expected)',
+                    note: 'This is normal - policies can only be queried with service role'
+                }, null, 2);
+                result.parentElement.classList.add('warning');
+            }
+        }
+
+        async function testWithAuth() {
+            const result = document.getElementById('auth-result');
+            result.textContent = 'Testing...';
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (!session) {
+                    result.textContent = 'ERROR: Not logged in';
+                    result.parentElement.classList.add('error');
+                    return;
+                }
+
+                // Get user role
+                const { data: profile } = await supabase
+                    .from('user_profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single();
+
+                // Try to fetch documents
+                const { data: docs, error: docsError } = await supabase
+                    .from('maintenance_documents')
+                    .select('id, file_name, customer_id')
+                    .limit(5);
+
+                // Try to fetch customers
+                const { data: custs, error: custsError } = await supabase
+                    .from('customers')
+                    .select('id, company_name')
+                    .limit(5);
+
+                result.textContent = JSON.stringify({
+                    success: true,
+                    user_role: profile?.role,
+                    documents_accessible: !docsError,
+                    documents_count: docs?.length || 0,
+                    documents_error: docsError?.message,
+                    customers_accessible: !custsError,
+                    customers_count: custs?.length || 0,
+                    customers_error: custsError?.message,
+                    sample_documents: docs,
+                    sample_customers: custs
+                }, null, 2);
+
+                if (docsError || custsError) {
+                    result.parentElement.classList.add('error');
+                } else {
+                    result.parentElement.classList.add('success');
+                }
+            } catch (error) {
+                result.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message
+                }, null, 2);
+                result.parentElement.classList.add('error');
+            }
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            console.log('Page loaded. Run tests manually or auto-run all:');
+            // Uncomment to auto-run all tests
+            // setTimeout(checkUser, 500);
+            // setTimeout(checkTables, 1500);
+            // setTimeout(countDocuments, 2500);
+        });
+    </script>
+</body>
+</html>
