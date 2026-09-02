@@ -37,9 +37,9 @@ function DataOverviewWidget({ onNavigate }: DataOverviewWidgetProps) {
   const [selectedEquipmentType, setSelectedEquipmentType] = useState<string>('all');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedCapacity, setSelectedCapacity] = useState<string>('all');
-  const [yearRange, setYearRange] = useState({ min: 1990, max: new Date().getFullYear() });
-  const [hoursRange, setHoursRange] = useState({ min: 0, max: 50000 });
-  const [capacityRange, setCapacityRange] = useState({ min: 0, max: 100000 });
+  const [yearRange, setYearRange] = useState<{ min: number | ''; max: number | '' }>({ min: 1990, max: new Date().getFullYear() });
+  const [hoursRange, setHoursRange] = useState<{ min: number | ''; max: number | '' }>({ min: 0, max: 50000 });
+  const [capacityRange, setCapacityRange] = useState<{ min: number | ''; max: number | '' }>({ min: 0, max: 100000 });
 
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
   const [availableCapacities, setAvailableCapacities] = useState<number[]>([]);
@@ -165,21 +165,25 @@ function DataOverviewWidget({ onNavigate }: DataOverviewWidgetProps) {
     }
 
     // Apply capacity range filter for heavy duty forklifts
+    // Een leeg min/max-veld betekent "geen grens"
+    const lo = (v: number | '') => (v === '' ? -Infinity : v);
+    const hi = (v: number | '') => (v === '' ? Infinity : v);
+
     if (selectedEquipmentType === 'heavy_duty_forklift') {
       filtered = filtered.filter(r => {
         if (r.capacity_kg === null) return true;
-        return r.capacity_kg >= capacityRange.min && r.capacity_kg <= capacityRange.max;
+        return r.capacity_kg >= lo(capacityRange.min) && r.capacity_kg <= hi(capacityRange.max);
       });
     }
 
     filtered = filtered.filter(r => {
       if (!r.year) return true;
-      return r.year >= yearRange.min && r.year <= yearRange.max;
+      return r.year >= lo(yearRange.min) && r.year <= hi(yearRange.max);
     });
 
     filtered = filtered.filter(r => {
       if (r.hours === null) return true;
-      return r.hours >= hoursRange.min && r.hours <= hoursRange.max;
+      return r.hours >= lo(hoursRange.min) && r.hours <= hi(hoursRange.max);
     });
 
     setFilteredRecords(filtered);
@@ -355,20 +359,20 @@ function DataOverviewWidget({ onNavigate }: DataOverviewWidgetProps) {
               {selectedEquipmentType === 'heavy_duty_forklift' && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Hefcapaciteit: {capacityRange.min.toLocaleString('nl-NL')} - {capacityRange.max.toLocaleString('nl-NL')} kg
+                    Hefcapaciteit: {capacityRange.min === '' ? '' : capacityRange.min.toLocaleString('nl-NL')} - {capacityRange.max === '' ? '' : capacityRange.max.toLocaleString('nl-NL')} kg
                   </label>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       value={capacityRange.min}
-                      onChange={(e) => setCapacityRange({ ...capacityRange, min: parseInt(e.target.value) || 0 })}
+                      onChange={(e) => setCapacityRange({ ...capacityRange, min: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Min kg"
                     />
                     <input
                       type="number"
                       value={capacityRange.max}
-                      onChange={(e) => setCapacityRange({ ...capacityRange, max: parseInt(e.target.value) || 100000 })}
+                      onChange={(e) => setCapacityRange({ ...capacityRange, max: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Max kg"
                     />
@@ -384,14 +388,14 @@ function DataOverviewWidget({ onNavigate }: DataOverviewWidgetProps) {
                   <input
                     type="number"
                     value={yearRange.min}
-                    onChange={(e) => setYearRange({ ...yearRange, min: parseInt(e.target.value) || 1990 })}
+                    onChange={(e) => setYearRange({ ...yearRange, min: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Min"
                   />
                   <input
                     type="number"
                     value={yearRange.max}
-                    onChange={(e) => setYearRange({ ...yearRange, max: parseInt(e.target.value) || new Date().getFullYear() })}
+                    onChange={(e) => setYearRange({ ...yearRange, max: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Max"
                   />
@@ -406,14 +410,14 @@ function DataOverviewWidget({ onNavigate }: DataOverviewWidgetProps) {
                   <input
                     type="number"
                     value={hoursRange.min}
-                    onChange={(e) => setHoursRange({ ...hoursRange, min: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setHoursRange({ ...hoursRange, min: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Min"
                   />
                   <input
                     type="number"
                     value={hoursRange.max}
-                    onChange={(e) => setHoursRange({ ...hoursRange, max: parseInt(e.target.value) || 50000 })}
+                    onChange={(e) => setHoursRange({ ...hoursRange, max: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Max"
                   />

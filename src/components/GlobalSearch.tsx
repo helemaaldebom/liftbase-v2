@@ -127,25 +127,25 @@ export function GlobalSearch({ onNavigate }: GlobalSearchProps) {
       const forkliftQuery = await supabase
         .from('forklift_details')
         .select('dossier_id, serial_no')
-        .ilike('serial_no', searchTerm)
+        .or(`serial_no.ilike.${searchTerm},customer_fleet_number.ilike.${searchTerm}`)
         .limit(10);
 
       const echQuery = await supabase
         .from('empty_container_handler_details')
         .select('dossier_id, serial_no')
-        .ilike('serial_no', searchTerm)
+        .or(`serial_no.ilike.${searchTerm},customer_fleet_number.ilike.${searchTerm}`)
         .limit(10);
 
       const reachstackerQuery = await supabase
         .from('reachstacker_details')
         .select('dossier_id, serial_no')
-        .ilike('serial_no', searchTerm)
+        .or(`serial_no.ilike.${searchTerm},customer_fleet_number.ilike.${searchTerm}`)
         .limit(10);
 
       const terminalTractorQuery = await supabase
         .from('terminal_tractor_details')
         .select('dossier_id, serial_no')
-        .ilike('serial_no', searchTerm)
+        .or(`serial_no.ilike.${searchTerm},customer_fleet_number.ilike.${searchTerm}`)
         .limit(10);
 
       const detailsDossierIds = [

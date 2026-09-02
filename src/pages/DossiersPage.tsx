@@ -156,62 +156,43 @@ export function DossiersPage({
           user_profiles:created_by (
             full_name
           ),
+          customers:customer_id (
+            company_name,
+            contact_person
+          ),
           forklift_details(*),
           ech_details:empty_container_handler_details(*),
           reachstacker_details(*),
-          terminal_tractor_details(*)
+          terminal_tractor_details(*),
+          advertisement_publications(dossier_id, published_at),
+          photos(id, dossier_id, storage_path, display_order, visible_online)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Fetch first publication dates for all dossiers
-      const dossierIds = (data || []).map(d => d.id);
-      const { data: publicationData } = await supabase
-        .from('advertisement_publications')
-        .select('dossier_id, published_at')
-        .in('dossier_id', dossierIds)
-        .not('published_at', 'is', null)
-        .order('published_at', { ascending: true });
+      // Add first publication date and photos to each dossier (derived from nested data)
+      const dossiersWithData = (data || []).map((dossier: any) => {
+        const pubs: any[] = (dossier.advertisement_publications || [])
+          .filter((p: any) => p.published_at)
+          .sort((a: any, b: any) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime());
 
-      // Fetch photos for all dossiers (limited to 3 per dossier)
-      const { data: photosData } = await supabase
-        .from('photos')
-        .select('id, dossier_id, storage_path, display_order')
-        .in('dossier_id', dossierIds)
-        .eq('visible_online', true)
-        .order('display_order', { ascending: true });
+        const visiblePhotos: Photo[] = (dossier.photos || [])
+          .filter((p: any) => p.visible_online)
+          .sort((a: any, b: any) => a.display_order - b.display_order)
+          .slice(0, 3)
+          .map((p: any) => ({ id: p.id, storage_path: p.storage_path, display_order: p.display_order }));
 
-      // Create a map of first publication dates
-      const firstPublicationMap = new Map<string, string>();
-      publicationData?.forEach(pub => {
-        if (!firstPublicationMap.has(pub.dossier_id)) {
-          firstPublicationMap.set(pub.dossier_id, pub.published_at);
-        }
+        return {
+          ...dossier,
+          // Val terug op de gekoppelde klant (via customer_id) als het losse
+          // customer_name-veld leeg is, zodat lijst/filter/zoeken consistent zijn
+          // met het detailscherm (dat de klant ook via customer_id toont).
+          customer_name: dossier.customer_name || dossier.customers?.company_name || null,
+          first_published_at: pubs[0]?.published_at || null,
+          photos: visiblePhotos,
+        };
       });
-
-      // Create a map of photos per dossier (max 3)
-      const photosMap = new Map<string, Photo[]>();
-      photosData?.forEach(photo => {
-        if (!photosMap.has(photo.dossier_id)) {
-          photosMap.set(photo.dossier_id, []);
-        }
-        const dossierPhotos = photosMap.get(photo.dossier_id)!;
-        if (dossierPhotos.length < 3) {
-          dossierPhotos.push({
-            id: photo.id,
-            storage_path: photo.storage_path,
-            display_order: photo.display_order
-          });
-        }
-      });
-
-      // Add first publication date and photos to each dossier
-      const dossiersWithData = (data || []).map(dossier => ({
-        ...dossier,
-        first_published_at: firstPublicationMap.get(dossier.id) || null,
-        photos: photosMap.get(dossier.id) || []
-      }));
 
       setDossiers(dossiersWithData);
     } catch (error) {
@@ -394,7 +375,8 @@ export function DossiersPage({
         updateData.customer_name = customerName.trim();
         updateData.sold_at = new Date().toISOString();
       } else {
-        updateData.customer_name = null;
+        // Klantnaam NIET wissen bij stock/open/bieden — de klant blijft aan de
+        // machine gekoppeld; alleen de verkoop-datum wordt teruggezet.
         updateData.sold_at = null;
       }
 

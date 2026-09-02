@@ -65,9 +65,10 @@ export function NewDossierModal({ onClose, onSuccess }: NewDossierModalProps) {
       // First trigger the navigation, then close modal to prevent race condition
       onSuccess(newDossier.id);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating dossier:', err);
-      setError(err instanceof Error ? err.message : t('common.error'));
+      const msg = err?.message || err?.error_description || JSON.stringify(err);
+      setError(msg || t('common.error'));
       setLoading(false);
     }
   };

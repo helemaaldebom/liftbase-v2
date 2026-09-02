@@ -1,6 +1,19 @@
 import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, ChevronDown, ChevronUp, Copy, AlertCircle } from 'lucide-react';
+
+interface UploadAttempt {
+  attempt: number;
+  error: string;
+  type: string;
+  timestamp: string;
+}
+
+interface UploadErrorEntry {
+  filename: string;
+  filesize: number;
+  attempts: UploadAttempt[];
+}
 
 interface PhotoUploadProps {
   dossierId: string;
@@ -13,9 +26,25 @@ export function PhotoUpload({ dossierId, onUploadComplete }: PhotoUploadProps) {
   const [error, setError] = useState<string>('');
   const [progress, setProgress] = useState<string>('');
   const [compressionInfo, setCompressionInfo] = useState<string>('');
+  const [uploadErrorLog, setUploadErrorLog] = useState<UploadErrorEntry[]>([]);
+  const [errorLogExpanded, setErrorLogExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const compressImage = async (file: File, maxSizeMB: number = 4.5): Promise<File> => {
+  const classifyError = (err: any): { message: string; type: string } => {
+    const msg = err?.message || err?.toString() || 'Onbekende fout';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch')) {
+      return { message: msg, type: 'network' };
+    }
+    if (err?.statusCode || err?.status) {
+      return { message: `HTTP ${err.statusCode || err.status}: ${msg}`, type: 'storage' };
+    }
+    if (msg.includes('duplicate') || msg.includes('violates') || msg.includes('unique')) {
+      return { message: msg, type: 'database' };
+    }
+    return { message: msg, type: 'unknown' };
+  };
+
+  const compressImage = async (file: File, maxSizeMB: number = 2): Promise<File> => {
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
     if (file.size <= maxSizeBytes) {
@@ -117,71 +146,75 @@ export function PhotoUpload({ dossierId, onUploadComplete }: PhotoUploadProps) {
     return null;
   };
 
-  const uploadFile = async (file: File, orderIndex: number): Promise<{ success: boolean; error?: string }> => {
+  const uploadFile = async (file: File, orderIndex: number): Promise<{ success: boolean; errorEntry?: UploadErrorEntry }> => {
     console.log(`Uploading file: ${file.name}, size: ${file.size}, type: ${file.type}`);
 
     const validationError = validateFile(file);
     if (validationError) {
-      console.error(`Validation failed for ${file.name}:`, validationError);
-      return { success: false, error: validationError };
+      return { success: false, errorEntry: { filename: file.name, filesize: file.size, attempts: [{ attempt: 0, error: validationError, type: 'validation', timestamp: new Date().toISOString() }] } };
     }
 
-    try {
-      const { data: existingPhotos, error: selectError } = await supabase
-        .from('photos')
-        .select('display_order')
-        .eq('dossier_id', dossierId)
-        .order('display_order', { ascending: false })
-        .limit(1);
+    const maxRetries = 5;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${dossierId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const attemptLog: UploadAttempt[] = [];
 
-      if (selectError) {
-        console.error(`Error getting existing photos for ${file.name}:`, selectError);
-        throw new Error(`Database fout: ${selectError.message}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Uploading ${file.name} — poging ${attempt}/${maxRetries}`);
+
+        const { data: existingPhotos, error: selectError } = await supabase
+          .from('photos')
+          .select('display_order')
+          .eq('dossier_id', dossierId)
+          .order('display_order', { ascending: false })
+          .limit(1);
+
+        if (selectError) throw new Error(`Database fout: ${selectError.message}`);
+
+        const maxOrder = existingPhotos && existingPhotos.length > 0 ? existingPhotos[0].display_order : -1;
+        const newDisplayOrder = maxOrder + 1 + orderIndex;
+
+        const { error: uploadError } = await supabase.storage
+          .from('dossier-photos')
+          .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) {
+          if (uploadError.message?.includes('already exists') || (uploadError as any).statusCode === '409') {
+            console.log(`✓ Bestand bestaat al: ${file.name}`);
+          } else {
+            throw new Error(`Storage fout: ${uploadError.message}`);
+          }
+        }
+
+        const { error: dbError } = await supabase
+          .from('photos')
+          .insert({
+            dossier_id: dossierId,
+            storage_path: fileName,
+            filename: file.name,
+            file_size_bytes: file.size,
+            step_key: 'dossier',
+            display_order: newDisplayOrder,
+            quality_passed: true,
+          });
+
+        if (dbError) throw new Error(`Database fout: ${dbError.message}`);
+
+        console.log(`✓ Upload succesvol: ${file.name}`);
+        return { success: true };
+      } catch (err: any) {
+        const classified = classifyError(err);
+        console.error(`Poging ${attempt} mislukt voor ${file.name}:`, err);
+        attemptLog.push({ attempt, error: classified.message, type: classified.type, timestamp: new Date().toISOString() });
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+        }
       }
-
-      const maxOrder = existingPhotos && existingPhotos.length > 0 ? existingPhotos[0].display_order : -1;
-      const newDisplayOrder = maxOrder + 1 + orderIndex;
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${dossierId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      console.log(`Uploading ${file.name} to storage as ${fileName}`);
-      const { error: uploadError } = await supabase.storage
-        .from('dossier-photos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error(`Storage upload failed for ${file.name}:`, uploadError);
-        throw new Error(`Storage fout: ${uploadError.message}`);
-      }
-
-      console.log(`Inserting ${file.name} into database`);
-      const { error: dbError } = await supabase
-        .from('photos')
-        .insert({
-          dossier_id: dossierId,
-          storage_path: fileName,
-          filename: file.name,
-          file_size_bytes: file.size,
-          step_key: 'dossier',
-          display_order: newDisplayOrder,
-          quality_passed: true,
-        });
-
-      if (dbError) {
-        console.error(`Database insert failed for ${file.name}:`, dbError);
-        throw new Error(`Database fout: ${dbError.message}`);
-      }
-
-      console.log(`Successfully uploaded ${file.name}`);
-      return { success: true };
-    } catch (err: any) {
-      console.error(`Upload error for ${file.name}:`, err);
-      return { success: false, error: err.message || 'Upload mislukt' };
     }
+
+    console.error(`✗ Upload definitief mislukt na ${maxRetries} pogingen: ${file.name}`);
+    return { success: false, errorEntry: { filename: file.name, filesize: file.size, attempts: attemptLog } };
   };
 
   const uploadMultipleFiles = async (files: File[]) => {
@@ -204,35 +237,31 @@ export function PhotoUpload({ dossierId, onUploadComplete }: PhotoUploadProps) {
     }
 
     if (compressedCount > 0) {
-      setCompressionInfo(`${compressedCount} foto's automatisch verkleind naar max. 4.5MB`);
+      setCompressionInfo(`${compressedCount} foto's automatisch verkleind naar max. 2 MB`);
     }
 
-    setProgress(`Uploaden ${compressedFiles.length} foto's...`);
-
-    const uploadPromises = compressedFiles.map((file, index) => uploadFile(file, index));
-    const results = await Promise.all(uploadPromises);
+    setUploadErrorLog([]);
+    setErrorLogExpanded(false);
 
     let successCount = 0;
-    let failCount = 0;
+    const errorEntries: UploadErrorEntry[] = [];
 
-    results.forEach((result, index) => {
+    for (let i = 0; i < compressedFiles.length; i++) {
+      setProgress(`Uploaden ${i + 1} van ${compressedFiles.length} foto's...`);
+      const result = await uploadFile(compressedFiles[i], i);
       if (result.success) {
         successCount++;
-      } else {
-        failCount++;
+      } else if (result.errorEntry) {
+        errorEntries.push(result.errorEntry);
       }
-    });
+    }
 
     setUploading(false);
     setProgress('');
 
-    if (failCount > 0) {
-      const failedDetails = results
-        .map((r, i) => ({ ...r, file: files[i].name }))
-        .filter(r => !r.success)
-        .map(r => `${r.file} (${r.error || 'Onbekende fout'})`)
-        .join('. ');
-      setError(`${failCount} van ${files.length} foto's zijn mislukt: ${failedDetails}`);
+    if (errorEntries.length > 0) {
+      setUploadErrorLog(errorEntries);
+      setError(`${errorEntries.length} van ${compressedFiles.length} foto's zijn mislukt — zie details hieronder`);
     }
 
     if (successCount > 0) {
@@ -310,7 +339,7 @@ export function PhotoUpload({ dossierId, onUploadComplete }: PhotoUploadProps) {
                 JPEG, PNG, WebP of GIF
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                Grote foto's worden automatisch verkleind naar 4.5MB
+                Grote foto's worden automatisch verkleind naar 2 MB
               </p>
             </div>
           </div>
@@ -321,6 +350,54 @@ export function PhotoUpload({ dossierId, onUploadComplete }: PhotoUploadProps) {
         <div className="mt-3 flex items-start space-x-2 p-3 bg-red-50 border border-red-200 rounded-md">
           <X className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {uploadErrorLog.length > 0 && (
+        <div className="mt-2 border border-red-200 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setErrorLogExpanded(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {uploadErrorLog.length} foto{uploadErrorLog.length !== 1 ? "'s" : ''} mislukt — klik voor details
+            </span>
+            {errorLogExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {errorLogExpanded && (
+            <div className="bg-white p-3 space-y-3 max-h-72 overflow-y-auto text-xs font-mono">
+              <button
+                onClick={() => {
+                  const lines = uploadErrorLog.map(e => {
+                    const attemptLines = e.attempts.map(a =>
+                      `  poging ${a.attempt} [${a.timestamp}] (${a.type}): ${a.error}`
+                    ).join('\n');
+                    return `${e.filename} (${(e.filesize / 1024).toFixed(1)} KB)\n${attemptLines}`;
+                  }).join('\n\n');
+                  const header = `Upload error log — ${new Date().toLocaleString('nl-NL')}\nURL: ${window.location.href}\nUser-Agent: ${navigator.userAgent}\n\n`;
+                  navigator.clipboard.writeText(header + lines);
+                }}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mb-2"
+              >
+                <Copy className="w-3 h-3" /> Kopieer log voor support
+              </button>
+
+              {uploadErrorLog.map((entry, i) => (
+                <div key={i} className="border-l-2 border-red-300 pl-3">
+                  <div className="font-semibold text-gray-800">
+                    {entry.filename} <span className="text-gray-400 font-normal">({(entry.filesize / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  {entry.attempts.map((a, j) => (
+                    <div key={j} className={`mt-1 ${a.type === 'network' ? 'text-orange-600' : a.type === 'storage' ? 'text-red-600' : a.type === 'database' ? 'text-purple-600' : 'text-gray-600'}`}>
+                      poging {a.attempt} — <span className="bg-gray-100 px-1 rounded">{a.type}</span> — {a.error}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
