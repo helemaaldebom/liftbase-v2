@@ -21,7 +21,7 @@ const PLATFORMS = [
   { key: 'hcl', label: 'Eigen website (heavycargolifters.com)', enabled: true, directPublish: true },
   { key: 'forklift_international', label: 'Forklift International', enabled: true, directPublish: true },
   { key: 'mascus', label: 'Mascus', enabled: true, directPublish: false, hint: 'via Forklift International' },
-  { key: 'truck1', label: 'Truck1.eu', enabled: false, directPublish: false },
+  { key: 'truck1', label: 'Truck1.eu', enabled: true, directPublish: true },
   { key: 'trucksnl', label: 'TrucksNL', enabled: false, directPublish: false },
   { key: 'machineseeker', label: 'Machineseeker', enabled: false, directPublish: false },
   { key: 'truckscout24', label: 'TruckScout24', enabled: false, directPublish: false },
@@ -85,11 +85,13 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
   const PUBLISH_FUNCTIONS: Record<string, string> = {
     forklift_international: 'publish-to-forklift-international',
     hcl: 'publish-to-hcl-website',
+    truck1: 'publish-to-truck1',
   };
 
   const PLATFORM_LABELS: Record<string, string> = {
     forklift_international: 'Forklift International',
     hcl: 'de website',
+    truck1: 'Truck1.eu',
   };
 
   const handlePublishNow = async (platform: string) => {
