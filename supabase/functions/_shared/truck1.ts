@@ -98,9 +98,17 @@ export async function sendToTruck1(ads: Record<string, unknown>, opts: { test?: 
   if (opts.test) data.test = '1';
 
   const body = new URLSearchParams({ provider: providerKey, data: JSON.stringify(data) });
-  const response = await fetch(TRUCK1_ENDPOINT, {
+
+  // Truck1 blokkeert cloud-IP's; daarom loopt het verkeer via de relay op de
+  // Hetzner-server (TRUCK1_RELAY_URL), beveiligd met het CRON_SECRET.
+  const relayUrl = Deno.env.get('TRUCK1_RELAY_URL');
+  const endpoint = relayUrl || TRUCK1_ENDPOINT;
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (relayUrl) headers['X-Relay-Secret'] = Deno.env.get('CRON_SECRET') ?? '';
+
+  const response = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers,
     body: body.toString(),
   });
 
