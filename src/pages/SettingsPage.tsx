@@ -850,6 +850,7 @@ function EditUserModal({ user, onClose, onSuccess }: EditUserModalProps) {
     active: user.dealer ? user.dealer.active : user.active,
     has_taxatietool_access: user.has_taxatietool_access || false,
   });
+  const [newPassword, setNewPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -938,6 +939,34 @@ function EditUserModal({ user, onClose, onSuccess }: EditUserModalProps) {
           console.error('Profile update error:', profileError);
           throw new Error(`Fout bij bijwerken profiel: ${profileError.message}${profileError.hint ? ` (${profileError.hint})` : ''}`);
         }
+
+        // Nieuw wachtwoord instellen kan alleen server-side (admin API)
+        if (newPassword) {
+          const { data: { session } } = await supabase.auth.getSession();
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-user`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session?.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                email: formData.email,
+                full_name: formData.full_name,
+                role: formData.role,
+                active: formData.active,
+                has_taxatietool_access: formData.has_taxatietool_access,
+                newPassword,
+              }),
+            }
+          );
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Wachtwoord instellen mislukt');
+          }
+        }
       }
 
       alert('Gebruiker succesvol bijgewerkt!');
@@ -1018,6 +1047,24 @@ function EditUserModal({ user, onClose, onSuccess }: EditUserModalProps) {
               <option value="dealer">Dealer</option>
             </select>
           </div>
+
+          {!user.id.startsWith('dealer_') && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Nieuw wachtwoord
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+                placeholder="Laat leeg om niet te wijzigen"
+                autoComplete="new-password"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">Minimaal 8 tekens. De gebruiker kan hiermee direct inloggen.</p>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center">

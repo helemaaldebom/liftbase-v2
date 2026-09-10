@@ -15,6 +15,7 @@ interface UpdateUserRequest {
   active: boolean;
   has_taxatietool_access: boolean;
   dealerId?: string;
+  newPassword?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -59,8 +60,13 @@ Deno.serve(async (req: Request) => {
       role,
       active,
       has_taxatietool_access,
-      dealerId
+      dealerId,
+      newPassword
     }: UpdateUserRequest = await req.json();
+
+    if (newPassword && newPassword.length < 8) {
+      throw new Error("Wachtwoord moet minimaal 8 tekens zijn");
+    }
 
     if (!userId) {
       throw new Error("userId is required");
@@ -101,9 +107,12 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to update user profile: ${profileError.message}`);
     }
 
+    const authUpdate: { email: string; password?: string } = { email };
+    if (newPassword) authUpdate.password = newPassword;
+
     const { error: authError } = await supabase.auth.admin.updateUserById(
       userId,
-      { email: email }
+      authUpdate
     );
 
     if (authError) {
