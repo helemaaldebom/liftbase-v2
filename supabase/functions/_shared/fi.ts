@@ -102,7 +102,8 @@ function generateMachineXML(data: MachineData, opts: { unpublish?: boolean; extr
     ['expmascus', (['1', 'true'].includes((Deno.env.get('FI_EXPORT_MASCUS') ?? '0').toLowerCase()) && dossier.publish_to_mascus) ? 1 : 0],
     ['expsupralift', 0],
     ['loccountry', mapLookup(COUNTRY_MAP, dossier.country || dossier.land, 4)],
-    ['loccity', escapeXml(dossier.location || dossier.locatie || '')],
+    // Machine-adressen zijn intern (Liftbase-only): geen plaats/adres naar F.I.
+    ['loccity', ''],
   ];
 
   const body = tags.map(([k, v]) => ` <${k}>${v}</${k}>`).join('\n');
