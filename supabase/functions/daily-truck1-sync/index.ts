@@ -71,9 +71,13 @@ Deno.serve(async (req: Request) => {
     const publishData = await fetchMachineData(supabase, toPublish ?? []);
     const unpublishData = await fetchMachineData(supabase, toUnpublish);
 
+    const alreadyPublished = new Set((published ?? []).map((p: any) => p.dossier_id));
     const ads: Record<string, unknown> = {};
     for (const item of publishData) {
-      ads[item.dossier.dossier_number] = { action: 'add', ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl) };
+      ads[item.dossier.dossier_number] = {
+        action: alreadyPublished.has(item.dossier.id) ? 'update' : 'add',
+        ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl),
+      };
     }
     for (const item of unpublishData) {
       ads[item.dossier.dossier_number] = { action: 'delete' };

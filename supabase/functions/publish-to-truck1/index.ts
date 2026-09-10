@@ -48,11 +48,23 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const machineData = await fetchMachineData(supabase, publishable);
 
+    // Bestaande Truck1-advertenties krijgen action=update i.p.v. add
+    const { data: existingPubs } = await supabase
+      .from('advertisement_publications')
+      .select('dossier_id')
+      .eq('platform', 'truck1')
+      .eq('status', 'published')
+      .in('dossier_id', publishable.map((d: any) => d.id));
+    const alreadyPublished = new Set((existingPubs ?? []).map((p: any) => p.dossier_id));
+
     const ads: Record<string, unknown> = {};
     for (const item of machineData) {
       ads[item.dossier.dossier_number] = unpublish
         ? { action: 'delete' }
-        : { action: 'add', ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl) };
+        : {
+            action: alreadyPublished.has(item.dossier.id) ? 'update' : 'add',
+            ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl),
+          };
     }
 
     const result = await sendToTruck1(ads, { test: !!testMode });
@@ -82,6 +94,9 @@ Deno.serve(async (req: Request) => {
       summary: result.summary,
       errors: result.errors,
       warnings: result.warnings,
+      httpStatus: result.status,
+      busy: result.busy,
+      raw: result.raw,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     console.error('Fout in publish-to-truck1:', error);

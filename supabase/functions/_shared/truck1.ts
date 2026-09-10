@@ -63,7 +63,12 @@ export function buildAdPayload(dossier: any, details: any, photos: any[], supaba
     price: intVal(dossier.eindklantprijs),
     price_orig_currency: 'EUR',
     price_type: 1, // netto
-    addr: dossier.location || dossier.locatie || '',
+    // Alleen het land tonen als locatie, niet het volledige adres (wens Tigran/Bas)
+    addr: (() => {
+      const land = String(dossier.country || dossier.land || 'NL').trim();
+      const namen: Record<string, string> = { nl: 'Nederland', be: 'België', de: 'Deutschland' };
+      return namen[land.toLowerCase()] ?? (land.length === 2 ? 'Nederland' : land);
+    })(),
     f_MachineHours: intVal(dossier.hours, dossier.uren, details?.hours_on_clock),
     f_LiftPayload: intVal(dossier.capacity, dossier.capaciteit, details?.capacity_kg),
     f_LiftHeight: intVal(dossier.lifting_height, dossier.hefhoogte, details?.lift_height_mm),
