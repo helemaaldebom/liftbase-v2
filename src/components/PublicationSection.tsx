@@ -22,9 +22,6 @@ const PLATFORMS = [
   { key: 'forklift_international', label: 'Forklift International', enabled: true, directPublish: true },
   { key: 'mascus', label: 'Mascus', enabled: true, directPublish: false, hint: 'via Forklift International' },
   { key: 'truck1', label: 'Truck1.eu', enabled: true, directPublish: true },
-  { key: 'trucksnl', label: 'TrucksNL', enabled: false, directPublish: false },
-  { key: 'machineseeker', label: 'Machineseeker', enabled: false, directPublish: false },
-  { key: 'truckscout24', label: 'TruckScout24', enabled: false, directPublish: false },
 ];
 
 export function PublicationSection({ dossierId, isManager, onPublicationUpdate }: PublicationSectionProps) {
