@@ -88,17 +88,11 @@ export function buildAdPayload(dossier: any, details: any, photos: any[], supaba
     f_Fuel: mapLookup(FUEL_MAP, dossier.fuel_type || dossier.brandstof, 1),
     f_Condition: mapLookup(CONDITION_MAP, dossier.condition, 3),
 
-    // Uitgebreide specificaties uit de detailtabellen (weggelaten indien leeg)
-    f_VIN: combi(dossier.serienummer || details?.serial_no),
+    // Uitgebreide specificaties uit de detailtabellen (selectie akkoord Tigran
+    // 11-09-2026: motor/transmissie/banden/mast/opties wél; serienummer,
+    // gewicht en afmetingen níet; vermogen n.v.t.)
     f_EngineMake: combi(details?.engine_brand, details?.engine_type),
     f_Gearbox: combi(details?.trans_brand, details?.trans_type),
-    f_Weight: intVal(details?.serviceweight_kg),
-    f_Length: intVal(details?.length_total_mm),
-    f_Width: intVal(details?.width_total_mm),
-    f_WheelBase: intVal(details?.wheelbase_mm, details?.wheelbase, dossier.wheelbase_mm),
-    f_FifthWheelHeight: intVal(details?.fifth_wheel_height_mm, dossier.fifth_wheel_height_mm),
-    f_CenterOfGravity: intVal(details?.load_center_mm, dossier.load_center),
-    f_ForkLength: intVal(details?.fork_length_mm),
     f_FrontTires: combi(details?.tire_size_front),
     f_RearTires: combi(details?.tire_size_back),
     f_MastType: details?.mast_type ? MAST_MAP[String(details.mast_type).trim().toLowerCase()] : undefined,
