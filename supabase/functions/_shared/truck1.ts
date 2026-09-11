@@ -51,6 +51,21 @@ function intVal(...candidates: unknown[]): number | undefined {
   return undefined;
 }
 
+/** 'ja'/'yes'/'x'/true e.d. naar Truck1-boolean (1); anders undefined (weglaten). */
+function boolVal(v: unknown): number | undefined {
+  if (v === true || v === 1) return 1;
+  const s = String(v ?? '').trim().toLowerCase();
+  return ['ja', 'yes', 'true', 'x', '1'].includes(s) ? 1 : undefined;
+}
+
+/** Combineert merk+type tot één tekstveld ("Volvo TAD750" etc.). */
+function combi(...parts: unknown[]): string | undefined {
+  const s = parts.map((p) => String(p ?? '').trim()).filter(Boolean).join(' ');
+  return s || undefined;
+}
+
+const MAST_MAP: Record<string, number> = { simplex: 1, duplex: 2, triplex: 4 };
+
 /** Bouwt het advertentie-object voor action=add/update. */
 export function buildAdPayload(dossier: any, details: any, photos: any[], supabaseUrl: string) {
   const title = [dossier.brand || dossier.merk, dossier.model || dossier.type].filter(Boolean).join(' ') || dossier.dossier_number;
@@ -72,7 +87,29 @@ export function buildAdPayload(dossier: any, details: any, photos: any[], supaba
     f_FreeLift: intVal(dossier.free_lift, details?.free_lift_mm),
     f_Fuel: mapLookup(FUEL_MAP, dossier.fuel_type || dossier.brandstof, 1),
     f_Condition: mapLookup(CONDITION_MAP, dossier.condition, 3),
-    notesen: dossier.description || '',
+
+    // Uitgebreide specificaties uit de detailtabellen (weggelaten indien leeg)
+    f_VIN: combi(dossier.serienummer || details?.serial_no),
+    f_EngineMake: combi(details?.engine_brand, details?.engine_type),
+    f_Gearbox: combi(details?.trans_brand, details?.trans_type),
+    f_Weight: intVal(details?.serviceweight_kg),
+    f_Length: intVal(details?.length_total_mm),
+    f_Width: intVal(details?.width_total_mm),
+    f_WheelBase: intVal(details?.wheelbase_mm, details?.wheelbase, dossier.wheelbase_mm),
+    f_FifthWheelHeight: intVal(details?.fifth_wheel_height_mm, dossier.fifth_wheel_height_mm),
+    f_CenterOfGravity: intVal(details?.load_center_mm, dossier.load_center),
+    f_ForkLength: intVal(details?.fork_length_mm),
+    f_FrontTires: combi(details?.tire_size_front),
+    f_RearTires: combi(details?.tire_size_back),
+    f_MastType: details?.mast_type ? MAST_MAP[String(details.mast_type).trim().toLowerCase()] : undefined,
+    f_AC: boolVal(details?.airco),
+    f_Heater: boolVal(details?.heater),
+    f_Radio: boolVal(details?.radio),
+    f_CentralLubrication: boolVal(details?.central_greasing_chassis),
+    f_DPF: boolVal(details?.particle_filter),
+
+    // Omschrijving: dossiertekst + externe opmerkingen uit de machinekaart
+    notesen: [dossier.description, details?.external_remarks].map((s) => String(s ?? '').trim()).filter(Boolean).join('\n\n'),
     images: photos.map((p) => `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`),
   };
 
