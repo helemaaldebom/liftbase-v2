@@ -8,6 +8,8 @@ export interface MachineData {
   dossier: any;
   details: any;
   photos: any[];
+  /** false = mee in de lijst maar offline (viewforklift=0) */
+  visible?: boolean;
 }
 
 // Appendix A — type of construction (binnen machine type=1 Forklift)
@@ -67,9 +69,10 @@ function intVal(...candidates: unknown[]): number {
   return 0;
 }
 
-function generateMachineXML(data: MachineData, opts: { unpublish?: boolean; extraTags?: string } = {}): string {
+function generateMachineXML(data: MachineData, opts: { extraTags?: string } = {}): string {
   const { dossier, details } = data;
-  const visible = opts.unpublish ? 0 : 1;
+  // Per machine: zichtbaar tenzij expliciet op onzichtbaar gezet
+  const visible = (data as any).visible === false ? 0 : 1;
 
   const tags: [string, string | number][] = [
     ['internalno', toInternalNo(dossier.dossier_number)],
@@ -110,9 +113,53 @@ function generateMachineXML(data: MachineData, opts: { unpublish?: boolean; extr
   return `<machine type="1">\n${body}${opts.extraTags ? '\n' + opts.extraTags : ''}\n</machine>`;
 }
 
-export function generateDataXML(code: string, data: MachineData[], opts: { unpublish?: boolean } = {}): string {
-  const machines = data.map((m) => generateMachineXML(m, opts)).join('\n');
+export function generateDataXML(code: string, data: MachineData[]): string {
+  const machines = data.map((m) => generateMachineXML(m)).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<machinelist code="${escapeXml(code)}">\n${machines}\n</machinelist>`;
+}
+
+/**
+ * KRITIEK (les van 14-09-2026): de F.I.-import is een TOTAALVERVANGER —
+ * machines die niet in de geüploade lijst staan worden door F.I. VERWIJDERD.
+ * Elke upload moet daarom ALTIJD de complete voorraad bevatten:
+ * - alle dossiers met vinkje aan en status niet sold/archived -> zichtbaar
+ * - dossiers die eerder gepubliceerd waren maar nu uitgevinkt/verkocht zijn
+ *   -> mee in de lijst met viewforklift=0 (offline, maar niet verdwenen uit
+ *   de lijst, zodat de rest intact blijft)
+ */
+export async function fetchCompleteFiSet(supabase: any): Promise<MachineData[]> {
+  const OFFLINE_STATUSES = ['sold', 'archived'];
+
+  const { data: flagged, error } = await supabase
+    .from('dossiers')
+    .select('*')
+    .eq('publish_to_forklift_international', true)
+    .eq('is_marktdata', false)
+    .not('status', 'in', `(${OFFLINE_STATUSES.join(',')})`)
+    .in('equipment_type', Object.keys(DETAILS_TABLE));
+  if (error) throw new Error(`Dossiers ophalen mislukt: ${error.message}`);
+
+  const flaggedIds = new Set((flagged ?? []).map((d: any) => d.id));
+
+  // Eerder gepubliceerde machines die niet meer in de zichtbare set zitten
+  const { data: published } = await supabase
+    .from('advertisement_publications')
+    .select('dossier_id')
+    .eq('platform', 'forklift_international')
+    .eq('status', 'published');
+  const staleIds = (published ?? [])
+    .map((p: any) => p.dossier_id)
+    .filter((id: string) => !flaggedIds.has(id));
+
+  let stale: any[] = [];
+  if (staleIds.length) {
+    const { data } = await supabase.from('dossiers').select('*').in('id', staleIds);
+    stale = (data ?? []).filter((d: any) => DETAILS_TABLE[d.equipment_type]);
+  }
+
+  const visibleData = await fetchMachineData(supabase, flagged ?? []);
+  const staleData = (await fetchMachineData(supabase, stale)).map((m) => ({ ...m, visible: false }));
+  return [...visibleData, ...staleData];
 }
 
 export function generateImageXML(code: string, data: MachineData[], supabaseUrl: string): string {
