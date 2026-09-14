@@ -156,10 +156,37 @@ export async function processDossiersToWC(
         }
       } else {
         const categoryId = await resolveCategory(cfg, CATEGORY_MAP[dossier.equipment_type] ?? 'Overig');
-        const payload = buildProductPayload(dossier, details, photos ?? [], supabaseUrl, categoryId, productStatus);
+        const allPhotos = photos ?? [];
+
+        // Foto's in porties: 40 foto's in één request geeft een PHP-timeout (500)
+        // op de site. Eerste portie gaat mee met het product, de rest volgt in
+        // losse updates waarbij reeds geïmporteerde foto's via hun id meegaan.
+        const BATCH = 5;
+        const payload = buildProductPayload(dossier, details, allPhotos.slice(0, BATCH), supabaseUrl, categoryId, productStatus);
         result = existingProduct
           ? await wcFetch(cfg, `/products/${existingProduct.id}`, { method: 'PUT', body: JSON.stringify(payload) })
           : await wcFetch(cfg, '/products', { method: 'POST', body: JSON.stringify(payload) });
+
+        if (result.ok && allPhotos.length > BATCH) {
+          const productId = result.json?.id ?? existingProduct?.id;
+          let bestaande = (result.json?.images ?? []).map((img: any) => ({ id: img.id }));
+          for (let i = BATCH; i < allPhotos.length && productId; i += BATCH) {
+            const nieuwe = allPhotos.slice(i, i + BATCH).map((p, idx) => ({
+              src: `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`,
+              position: i + idx,
+            }));
+            const batchResult = await wcFetch(cfg, `/products/${productId}`, {
+              method: 'PUT', body: JSON.stringify({ images: [...bestaande, ...nieuwe] }),
+            });
+            if (!batchResult.ok) {
+              console.error(`Fotobatch ${i / BATCH + 1} mislukt voor ${dossier.dossier_number}:`, batchResult.status, batchResult.text.slice(0, 200));
+              result = batchResult; // rapporteer de fout, maar product bestaat al
+              break;
+            }
+            bestaande = (batchResult.json?.images ?? []).map((img: any) => ({ id: img.id }));
+            result = batchResult;
+          }
+        }
       }
 
       const success = result.ok;
