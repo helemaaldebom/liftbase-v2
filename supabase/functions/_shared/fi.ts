@@ -191,8 +191,18 @@ export async function uploadXML(endpoint: string, xml: string, username: string,
   // F.I. antwoordt met een telling als "UPD: 0 - New: 1 - ERR: 0 - DEL: 0".
   const errMatch = text.match(/ERR:\s*(\d+)/i);
   const errCount = errMatch ? parseInt(errMatch[1], 10) : 0;
+  // Drukte-signalen: import geweigerd, later opnieuw proberen
+  const busy = /another import running/i.test(text);
+  // Een 200 zonder telling én zonder busy-melding is óók verdacht
+  const heeftTelling = /UPD:\s*\d+/i.test(text);
 
-  return { ok: response.ok && errCount === 0, status: response.status, body: text, errCount };
+  return {
+    ok: response.ok && errCount === 0 && !busy && heeftTelling,
+    busy,
+    status: response.status,
+    body: busy ? 'F.I. is nog bezig met de vorige import — wacht enkele minuten en probeer opnieuw' : text,
+    errCount,
+  };
 }
 
 /** Dossier + details + online-foto's ophalen voor een lijst dossiers. */
