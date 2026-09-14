@@ -142,10 +142,20 @@ export async function processDossiersToWC(
       .order('display_order', { ascending: true });
 
     try {
-      // status=any: vind ook concepten en producten in de prullenbak (voorkomt
-      // "SKU al aanwezig"-fouten door restanten van eerdere mislukte pogingen)
+      // status=any: vind ook concepten (voorkomt "SKU al aanwezig"-fouten)
       const existing = await wcFetch(cfg, `/products?sku=${encodeURIComponent(dossier.dossier_number)}&status=any`);
-      const existingProduct = (existing.json ?? [])[0];
+      let existingProduct = (existing.json ?? [])[0];
+
+      // Restanten in de prullenbak blokkeren de SKU maar zijn onvindbaar via
+      // status=any — die ruimen we definitief op voordat we opnieuw aanmaken.
+      if (!existingProduct && !unpublish) {
+        const trashed = await wcFetch(cfg, `/products?sku=${encodeURIComponent(dossier.dossier_number)}&status=trash`);
+        const trashedProduct = (trashed.json ?? [])[0];
+        if (trashedProduct) {
+          console.log(`Prullenbak-restant voor ${dossier.dossier_number} (id ${trashedProduct.id}) definitief verwijderen`);
+          await wcFetch(cfg, `/products/${trashedProduct.id}?force=true`, { method: 'DELETE' });
+        }
+      }
 
       let result;
       if (unpublish) {
