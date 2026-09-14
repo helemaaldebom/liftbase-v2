@@ -87,8 +87,9 @@ function generateMachineXML(data: MachineData, opts: { extraTags?: string } = {}
     ['liftingheight', intVal(dossier.lifting_height, dossier.hefhoogte, details?.lift_height_mm)],
     ['freelift', intVal(dossier.free_lift, details?.free_lift_mm)],
     ['enginetype', mapLookup(ENGINE_MAP, dossier.fuel_type || dossier.brandstof, 2)],
-    ['dealerprice', intVal(dossier.handelsprijs)],
-    ['custprice', intVal(dossier.eindklantprijs)],
+    // GEEN prijzen naar F.I. (wens Tigran 14-09): 0 = "prijs op aanvraag"
+    ['dealerprice', 0],
+    ['custprice', 0],
     ['capacity', intVal(dossier.capacity, dossier.capaciteit, details?.capacity_kg)],
     ['loadcenter', intVal(dossier.load_center, details?.load_center_mm)],
     ['masttype', 0],
