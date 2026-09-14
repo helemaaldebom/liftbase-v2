@@ -75,8 +75,9 @@ export function buildAdPayload(dossier: any, details: any, photos: any[], supaba
     model: dossier.model || dossier.type || '',
     titleen: title,
     ayear: intVal(dossier.year, dossier.bouwjaar),
-    // GEEN prijzen naar Truck1 (wens Tigran 14-09): zonder prijs toont
-    // Truck1 automatisch "Ask for price"
+    // GEEN prijzen naar Truck1 (wens Tigran 14-09): expliciet 0, zodat ook
+    // bestaande advertenties hun prijs kwijtraken -> "Ask for price"
+    price: 0,
     // Locatie bewust alleen "Nederland": machine-adressen zijn intern.
     // (Leeg laten kan niet — dan vult Truck1 het bedrijfsadres van de dealer in.)
     addr: 'Nederland',
