@@ -228,6 +228,33 @@ export async function processDossiersToWC(
         }
       }
 
+      // Anti-dubbel: oude producten (zonder dossiernummer-SKU) van dezelfde
+      // machine naar de prullenbak, zodat de Liftbase-versie de enige is.
+      const legacyOpgeruimd: string[] = [];
+      if (result.ok && !unpublish) {
+        try {
+          const naam = [dossier.brand || dossier.merk, dossier.model || dossier.type].filter(Boolean).join(' ').trim();
+          const jaar = String(dossier.year || dossier.bouwjaar || '');
+          if (naam) {
+            const zoek = await wcFetch(cfg, `/products?search=${encodeURIComponent(naam)}&per_page=20&status=any`);
+            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            for (const p of (zoek.json ?? [])) {
+              const isLegacy = !String(p.sku || '').toUpperCase().startsWith('HCL');
+              const zelfdeNaam = norm(p.name || '') === norm(naam);
+              if (!isLegacy || !zelfdeNaam || p.id === (result.json?.id ?? existingProduct?.id)) continue;
+              // bouwjaar vergelijken indien het oude product er een heeft
+              const jaarAttr = (p.attributes ?? []).find((a: any) => /jaar/i.test(a.name || ''));
+              const oudJaar = jaarAttr?.options?.[0] ? String(jaarAttr.options[0]).trim() : null;
+              if (oudJaar && jaar && oudJaar !== jaar) continue;
+              const del = await wcFetch(cfg, `/products/${p.id}`, { method: 'DELETE' }); // zonder force => prullenbak
+              if (del.ok) legacyOpgeruimd.push(`${p.name} (id ${p.id}, sku ${p.sku || '-'})`);
+            }
+          }
+        } catch (e: any) {
+          console.error(`Legacy-opruiming ${dossier.dossier_number} mislukt:`, e.message);
+        }
+      }
+
       const success = result.ok;
       const fotoUploadLoopt = success && !unpublish && (photos?.length ?? 0) > 0;
       await updateHclPublicationStatus(supabase, dossier.id,
@@ -242,6 +269,7 @@ export async function processDossiersToWC(
           product_url: result.json?.permalink ?? null,
           photo_count: photos?.length ?? 0,
           product_status: unpublish ? 'draft' : productStatus,
+          legacy_opgeruimd: legacyOpgeruimd.length ? legacyOpgeruimd : undefined,
         });
 
       results.push({
