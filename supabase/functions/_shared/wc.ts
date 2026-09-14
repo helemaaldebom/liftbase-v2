@@ -142,7 +142,9 @@ export async function processDossiersToWC(
       .order('display_order', { ascending: true });
 
     try {
-      const existing = await wcFetch(cfg, `/products?sku=${encodeURIComponent(dossier.dossier_number)}`);
+      // status=any: vind ook concepten en producten in de prullenbak (voorkomt
+      // "SKU al aanwezig"-fouten door restanten van eerdere mislukte pogingen)
+      const existing = await wcFetch(cfg, `/products?sku=${encodeURIComponent(dossier.dossier_number)}&status=any`);
       const existingProduct = (existing.json ?? [])[0];
 
       let result;
@@ -158,19 +160,19 @@ export async function processDossiersToWC(
         const categoryId = await resolveCategory(cfg, CATEGORY_MAP[dossier.equipment_type] ?? 'Overig');
         const allPhotos = photos ?? [];
 
-        // Foto's in porties: 40 foto's in één request geeft een PHP-timeout (500)
-        // op de site. Eerste portie gaat mee met het product, de rest volgt in
-        // losse updates waarbij reeds geïmporteerde foto's via hun id meegaan.
-        const BATCH = 5;
-        const payload = buildProductPayload(dossier, details, allPhotos.slice(0, BATCH), supabaseUrl, categoryId, productStatus);
+        // Foto's gescheiden van het product: de site is traag en valt in een
+        // timeout zodra er foto's in de eerste request zitten. Dus: product
+        // eerst zonder foto's aanmaken/bijwerken, daarna foto's in mini-porties.
+        const BATCH = 4;
+        const payload = buildProductPayload(dossier, details, [], supabaseUrl, categoryId, productStatus);
         result = existingProduct
           ? await wcFetch(cfg, `/products/${existingProduct.id}`, { method: 'PUT', body: JSON.stringify(payload) })
           : await wcFetch(cfg, '/products', { method: 'POST', body: JSON.stringify(payload) });
 
-        if (result.ok && allPhotos.length > BATCH) {
+        if (result.ok && allPhotos.length > 0) {
           const productId = result.json?.id ?? existingProduct?.id;
           let bestaande = (result.json?.images ?? []).map((img: any) => ({ id: img.id }));
-          for (let i = BATCH; i < allPhotos.length && productId; i += BATCH) {
+          for (let i = 0; i < allPhotos.length && productId; i += BATCH) {
             const nieuwe = allPhotos.slice(i, i + BATCH).map((p, idx) => ({
               src: `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`,
               position: i + idx,
