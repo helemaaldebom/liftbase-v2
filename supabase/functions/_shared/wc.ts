@@ -81,7 +81,9 @@ export function buildProductPayload(dossier: any, details: any, photos: any[], s
     type: 'simple',
     sku: dossier.dossier_number,
     status: productStatus,
-    regular_price: dossier.eindklantprijs ? String(dossier.eindklantprijs) : '',
+    // GEEN prijzen op de website (regel Tigran 14-09: prijzen zijn intern).
+    // Lege string wist ook bestaande prijzen bij een update.
+    regular_price: '',
     description: dossier.description || '',
     short_description: '',
     categories: categoryId ? [{ id: categoryId }] : [],
