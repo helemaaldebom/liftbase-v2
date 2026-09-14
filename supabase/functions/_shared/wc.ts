@@ -181,29 +181,57 @@ export async function processDossiersToWC(
 
         if (result.ok && allPhotos.length > 0) {
           const productId = result.json?.id ?? existingProduct?.id;
-          let bestaande = (result.json?.images ?? []).map((img: any) => ({ id: img.id }));
-          for (let i = 0; i < allPhotos.length && productId; i += BATCH) {
-            const nieuwe = allPhotos.slice(i, i + BATCH).map((p, idx) => ({
-              src: `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`,
-              position: i + idx,
-            }));
-            const batchResult = await wcFetch(cfg, `/products/${productId}`, {
-              method: 'PUT', body: JSON.stringify({ images: [...bestaande, ...nieuwe] }),
-            });
-            if (!batchResult.ok) {
-              console.error(`Fotobatch ${i / BATCH + 1} mislukt voor ${dossier.dossier_number}:`, batchResult.status, batchResult.text.slice(0, 200));
-              result = batchResult; // rapporteer de fout, maar product bestaat al
-              break;
+          const startImages = (result.json?.images ?? []).map((img: any) => ({ id: img.id }));
+
+          // De site is traag: alle fotobatches samen duren langer dan de
+          // request-limiet van de edge function. Daarom draait de foto-upload
+          // als achtergrondtaak door nadat de functie al geantwoord heeft;
+          // de publicatiestatus wordt aan het einde daarvan bijgewerkt.
+          const fotoTaak = async () => {
+            let bestaande = startImages;
+            let fout: string | null = null;
+            for (let i = 0; i < allPhotos.length && productId; i += BATCH) {
+              const nieuwe = allPhotos.slice(i, i + BATCH).map((p, idx) => ({
+                src: `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`,
+                position: i + idx,
+              }));
+              const batchResult = await wcFetch(cfg, `/products/${productId}`, {
+                method: 'PUT', body: JSON.stringify({ images: [...bestaande, ...nieuwe] }),
+              });
+              if (!batchResult.ok) {
+                fout = `Fotobatch ${Math.floor(i / BATCH) + 1}: ${batchResult.status} ${batchResult.text.slice(0, 150)}`;
+                console.error(`${dossier.dossier_number}: ${fout}`);
+                break;
+              }
+              bestaande = (batchResult.json?.images ?? []).map((img: any) => ({ id: img.id }));
             }
-            bestaande = (batchResult.json?.images ?? []).map((img: any) => ({ id: img.id }));
-            result = batchResult;
+            await updateHclPublicationStatus(supabase, dossier.id,
+              fout ? 'failed' : 'published',
+              fout,
+              {
+                sku: dossier.dossier_number,
+                action: actionLabel,
+                product_id: productId,
+                photo_count: fout ? bestaande.length : allPhotos.length,
+                product_status: productStatus,
+              });
+            console.log(`${dossier.dossier_number}: foto-upload klaar (${fout ? 'MET FOUT' : 'ok'})`);
+          };
+
+          if (typeof EdgeRuntime !== 'undefined' && (EdgeRuntime as any)?.waitUntil) {
+            (EdgeRuntime as any).waitUntil(fotoTaak());
+          } else {
+            await fotoTaak();
           }
         }
       }
 
       const success = result.ok;
+      const fotoUploadLoopt = success && !unpublish && (photos?.length ?? 0) > 0;
       await updateHclPublicationStatus(supabase, dossier.id,
-        success ? (unpublish ? 'deleted' : 'published') : 'failed',
+        // Bij lopende achtergrond-fotoupload: 'pending'; de taak zet hem
+        // daarna zelf op published/failed.
+        success ? (unpublish ? 'deleted' : (fotoUploadLoopt ? 'pending' : 'published')) : 'failed',
         success ? null : `WooCommerce ${result.status}: ${result.text.slice(0, 300)}`,
         {
           sku: dossier.dossier_number,
