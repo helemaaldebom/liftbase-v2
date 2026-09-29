@@ -93,26 +93,61 @@ export function PublicationDashboardPage({ onNavigate }: PublicationDashboardPag
     }
   };
 
+  // Eén knop die ALLE platforms synchroniseert o.b.v. de vinkjes per dossier.
+  // Per platform één aanroep: F.I. krijgt sowieso altijd de complete voorraad
+  // in één upload (dus geen "nog bezig met vorige import"-fouten meer zoals
+  // bij losse per-machine kliks), de andere platforms krijgen alle
+  // aangevinkte machines in één batch.
   const handleManualSync = async () => {
     setSyncing(true);
+    const uitkomsten: string[] = [];
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-advertisements`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}),
-        }
-      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Niet ingelogd');
 
-      if (!response.ok) {
-        throw new Error('Sync failed');
+      const KANALEN: { key: string; label: string; fn: string }[] = [
+        { key: 'publish_to_hcl', label: 'Website', fn: 'publish-to-hcl-website' },
+        { key: 'publish_to_forklift_international', label: 'Forklift International', fn: 'publish-to-forklift-international' },
+        { key: 'publish_to_truck1', label: 'Truck1.eu', fn: 'publish-to-truck1' },
+        { key: 'publish_to_mascus', label: 'Mascus', fn: 'publish-to-mascus' },
+      ];
+
+      for (const kanaal of KANALEN) {
+        const { data: flagged } = await supabase
+          .from('dossiers')
+          .select('id')
+          .eq(kanaal.key, true)
+          .eq('is_marktdata', false)
+          .not('status', 'in', '(sold,archived)');
+        const ids = (flagged ?? []).map((d) => d.id);
+        if (!ids.length) {
+          uitkomsten.push(`${kanaal.label}: geen machines aangevinkt`);
+          continue;
+        }
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${kanaal.fn}`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ dossierIds: ids }),
+            }
+          );
+          const result = await response.json();
+          if (response.ok && result.success !== false) {
+            uitkomsten.push(`${kanaal.label}: ✅ ${ids.length} machine(s) gesynchroniseerd`);
+          } else {
+            uitkomsten.push(`${kanaal.label}: ❌ ${result.error || 'fout bij platform'}`);
+          }
+        } catch (e: any) {
+          uitkomsten.push(`${kanaal.label}: ❌ ${e.message}`);
+        }
       }
 
-      const result = await response.json();
-      alert(`Sync voltooid: ${result.stats.successful_syncs} succesvol, ${result.stats.failed_syncs} mislukt`);
+      alert(`Synchronisatie klaar:\n\n${uitkomsten.join('\n')}\n\nLet op: foto-uploads naar de website lopen op de achtergrond nog even door.`);
       await loadData();
     } catch (error: any) {
       console.error('Error running sync:', error);
@@ -161,15 +196,26 @@ export function PublicationDashboardPage({ onNavigate }: PublicationDashboardPag
     }
   };
 
+  // Alleen de actuele kanalen tellen mee; records van oude platforms
+  // (trucksnl, machineseeker, truckscout24) vervuilen anders de cijfers.
+  const ACTIEVE_PLATFORMS = ['hcl', 'forklift_international', 'mascus', 'truck1'];
+  const PLATFORM_NAMEN: Record<string, string> = {
+    hcl: 'Website',
+    forklift_international: 'Forklift International',
+    mascus: 'Mascus',
+    truck1: 'Truck1.eu',
+  };
+  const actuelePublications = publications.filter(p => ACTIEVE_PLATFORMS.includes(p.platform));
+
   const filteredPublications = selectedPlatform === 'all'
-    ? publications
-    : publications.filter(p => p.platform === selectedPlatform);
+    ? actuelePublications
+    : actuelePublications.filter(p => p.platform === selectedPlatform);
 
   const stats = {
-    total: publications.length,
-    published: publications.filter(p => p.status === 'published' || p.status === 'updated').length,
-    failed: publications.filter(p => p.status === 'failed').length,
-    pending: publications.filter(p => p.status === 'pending').length,
+    total: actuelePublications.filter(p => p.status !== 'deleted').length,
+    published: actuelePublications.filter(p => p.status === 'published' || p.status === 'updated').length,
+    failed: actuelePublications.filter(p => p.status === 'failed').length,
+    pending: actuelePublications.filter(p => p.status === 'pending').length,
   };
 
   if (profile?.role !== 'manager') {
@@ -265,11 +311,10 @@ export function PublicationDashboardPage({ onNavigate }: PublicationDashboardPag
                 className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Alle platforms</option>
+                <option value="hcl">Website</option>
                 <option value="forklift_international">Forklift International</option>
+                <option value="truck1">Truck1.eu</option>
                 <option value="mascus">Mascus</option>
-                <option value="trucksnl">TrucksNL</option>
-                <option value="machineseeker">Machineseeker</option>
-                <option value="truckscout24">TruckScout24</option>
               </select>
             </div>
           </div>
@@ -324,8 +369,8 @@ export function PublicationDashboardPage({ onNavigate }: PublicationDashboardPag
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="capitalize font-medium text-slate-700">
-                            {pub.platform}
+                          <span className="font-medium text-slate-700">
+                            {PLATFORM_NAMEN[pub.platform] ?? pub.platform}
                           </span>
                         </td>
                         <td className="px-6 py-4">

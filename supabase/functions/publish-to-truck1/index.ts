@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
   buildAdPayload, sendToTruck1, fetchMachineData,
-  updateTruck1PublicationStatus, DETAILS_TABLE,
+  updateTruck1PublicationStatus, DETAILS_TABLE, photoFingerprint,
 } from "../_shared/truck1.ts";
 
 // Handmatig publiceren/offline halen van dossiers op Truck1.eu.
@@ -51,19 +51,23 @@ Deno.serve(async (req: Request) => {
     // Bestaande Truck1-advertenties krijgen action=update i.p.v. add
     const { data: existingPubs } = await supabase
       .from('advertisement_publications')
-      .select('dossier_id')
+      .select('dossier_id, metadata')
       .eq('platform', 'truck1')
       .eq('status', 'published')
       .in('dossier_id', publishable.map((d: any) => d.id));
     const alreadyPublished = new Set((existingPubs ?? []).map((p: any) => p.dossier_id));
+    const vorigeFp = new Map((existingPubs ?? []).map((p: any) => [p.dossier_id, p.metadata?.photo_fingerprint]));
 
     const ads: Record<string, unknown> = {};
     for (const item of machineData) {
+      const isUpdate = alreadyPublished.has(item.dossier.id);
+      // Ongewijzigde fotoset -> images weglaten (Truck1 laat ze dan staan)
+      const skipImages = isUpdate && vorigeFp.get(item.dossier.id) === photoFingerprint(item.photos);
       ads[item.dossier.dossier_number] = unpublish
         ? { action: 'delete' }
         : {
-            action: alreadyPublished.has(item.dossier.id) ? 'update' : 'add',
-            ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl),
+            action: isUpdate ? 'update' : 'add',
+            ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl, { skipImages }),
           };
     }
 
@@ -81,6 +85,7 @@ Deno.serve(async (req: Request) => {
             summary: result.summary,
             response: result.raw,
             photo_count: item.photos.length,
+            photo_fingerprint: (result.ok && !unpublish) ? photoFingerprint(item.photos) : vorigeFp.get(item.dossier.id) ?? null,
           }
         );
       }

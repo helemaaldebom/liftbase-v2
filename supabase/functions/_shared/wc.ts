@@ -1,6 +1,9 @@
 // Gedeelde WooCommerce-logica (heavycargolifters.com)
 // Gebruikt door publish-to-hcl-website en daily-hcl-sync.
 
+import { externeTekst, photoFingerprint } from "./extern.ts";
+export { photoFingerprint };
+
 export interface WCConfig { url: string; key: string; secret: string; }
 
 export function wcConfigFromEnv(): WCConfig {
@@ -70,7 +73,7 @@ function buildAttributes(dossier: any, details: any) {
   add('Gesloten hoogte', details?.closed_height_mm, ' mm');
   add('Bouwjaar', dossier.year || dossier.bouwjaar);
   add('Urenstand', dossier.hours || dossier.uren || details?.hours_on_clock, ' uur');
-  add('Serienummer', dossier.serienummer || details?.serial_number);
+  // Serienummer NIET op de website (besluit Tigran 15-09, net als bij Truck1)
   return attrs;
 }
 
@@ -84,7 +87,9 @@ export function buildProductPayload(dossier: any, details: any, photos: any[], s
     // GEEN prijzen op de website (regel Tigran 14-09: prijzen zijn intern).
     // Lege string wist ook bestaande prijzen bij een update.
     regular_price: '',
-    description: dossier.description || '',
+    // UITSLUITREGEL 16-09: alleen whitelisted externe tekst (zie extern.ts),
+    // nooit dossier.description of interne remarks
+    description: externeTekst(dossier, details),
     short_description: '',
     categories: categoryId ? [{ id: categoryId }] : [],
     images: photos.map((p, i) => ({
@@ -92,7 +97,13 @@ export function buildProductPayload(dossier: any, details: any, photos: any[], s
       position: i,
     })),
     attributes: buildAttributes(dossier, details),
-    meta_data: [{ key: 'liftbase_dossier_number', value: dossier.dossier_number }],
+    meta_data: [
+      { key: 'liftbase_dossier_number', value: dossier.dossier_number },
+      // Vingerafdruk van de fotoset: hiermee ziet de sync of de foto's al
+      // op het product staan, zodat ze niet elke keer opnieuw geüpload
+      // worden (fix 16-09: dagelijkse sync maakte duplicaten -> schijf vol)
+      { key: 'liftbase_photo_paths', value: photoFingerprint(photos) },
+    ],
   };
 }
 
@@ -132,6 +143,13 @@ export async function processDossiersToWC(
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const results: any[] = [];
 
+  // Foto's worden NIET meer in deze functie geüpload (fix 22-09): dat werk
+  // duurt langer dan de achtergrondtaak-limiet van edge functions en
+  // sneuvelde halverwege. De producten krijgen status 'pending' en de
+  // hcl-photo-worker (aparte functie met zelf-herinvocatie) werkt ze één
+  // voor één af, hervattend waar hij gebleven was.
+  let fotoWerkNodig = false;
+
   for (const dossier of dossiers) {
     const table = DETAILS_TABLE[dossier.equipment_type];
     const { data: details } = table
@@ -143,6 +161,7 @@ export async function processDossiersToWC(
       .eq('visible_online', true)
       .order('display_order', { ascending: true });
 
+    let fotosOngewijzigd = false;
     try {
       // status=any: vind ook concepten (voorkomt "SKU al aanwezig"-fouten)
       const existing = await wcFetch(cfg, `/products?sku=${encodeURIComponent(dossier.dossier_number)}&status=any`);
@@ -172,59 +191,34 @@ export async function processDossiersToWC(
         const categoryId = await resolveCategory(cfg, CATEGORY_MAP[dossier.equipment_type] ?? 'Overig');
         const allPhotos = photos ?? [];
 
+        // Foto's alleen uploaden als de set gewijzigd is (fix 16-09): de
+        // vingerafdruk in het product vertelt welke foto's er al op staan.
+        // Zo maakt de dagelijkse sync geen duplicaten meer in de mediabieb.
+        // 'liftbase_photos_done' wordt pas gezet als een fotoset VOLLEDIG op
+        // het product staat (door hcl-photo-worker) — half gelukte uploads
+        // tellen dus niet als "ongewijzigd".
+        const vorigeFingerprint = (existingProduct?.meta_data ?? [])
+          .find((m: any) => m.key === 'liftbase_photos_done')?.value ?? null;
+        fotosOngewijzigd = !!existingProduct
+          && vorigeFingerprint === photoFingerprint(allPhotos)
+          && (existingProduct.images?.length ?? 0) > 0;
+
         // Foto's gescheiden van het product: de site is traag en valt in een
-        // timeout zodra er foto's in de eerste request zitten. Dus: product
-        // eerst zonder foto's aanmaken/bijwerken, daarna foto's in mini-porties.
-        const BATCH = 4;
-        const payload = buildProductPayload(dossier, details, [], supabaseUrl, categoryId, productStatus);
+        // timeout zodra er foto's in de eerste request zitten. Het product
+        // wordt hier zonder foto's aangemaakt/bijgewerkt; de foto's zelf doet
+        // de hcl-photo-worker daarna (status 'pending' tot die klaar is).
+        const payload: any = buildProductPayload(dossier, details, allPhotos, supabaseUrl, categoryId, productStatus);
+        // NOOIT bestaande productfoto's wissen (harde regel 23-09): het
+        // images-veld gaat niet mee, dus wat er staat blijft staan. De
+        // hcl-photo-worker vervangt de set pas NADAT de nieuwe foto's er
+        // volledig naast staan (add-first, dan atomisch omwisselen).
+        delete payload.images;
         result = existingProduct
           ? await wcFetch(cfg, `/products/${existingProduct.id}`, { method: 'PUT', body: JSON.stringify(payload) })
           : await wcFetch(cfg, '/products', { method: 'POST', body: JSON.stringify(payload) });
 
-        if (result.ok && allPhotos.length > 0) {
-          const productId = result.json?.id ?? existingProduct?.id;
-          const startImages = (result.json?.images ?? []).map((img: any) => ({ id: img.id }));
-
-          // De site is traag: alle fotobatches samen duren langer dan de
-          // request-limiet van de edge function. Daarom draait de foto-upload
-          // als achtergrondtaak door nadat de functie al geantwoord heeft;
-          // de publicatiestatus wordt aan het einde daarvan bijgewerkt.
-          const fotoTaak = async () => {
-            let bestaande = startImages;
-            let fout: string | null = null;
-            for (let i = 0; i < allPhotos.length && productId; i += BATCH) {
-              const nieuwe = allPhotos.slice(i, i + BATCH).map((p, idx) => ({
-                src: `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`,
-                position: i + idx,
-              }));
-              const batchResult = await wcFetch(cfg, `/products/${productId}`, {
-                method: 'PUT', body: JSON.stringify({ images: [...bestaande, ...nieuwe] }),
-              });
-              if (!batchResult.ok) {
-                fout = `Fotobatch ${Math.floor(i / BATCH) + 1}: ${batchResult.status} ${batchResult.text.slice(0, 150)}`;
-                console.error(`${dossier.dossier_number}: ${fout}`);
-                break;
-              }
-              bestaande = (batchResult.json?.images ?? []).map((img: any) => ({ id: img.id }));
-            }
-            await updateHclPublicationStatus(supabase, dossier.id,
-              fout ? 'failed' : 'published',
-              fout,
-              {
-                sku: dossier.dossier_number,
-                action: actionLabel,
-                product_id: productId,
-                photo_count: fout ? bestaande.length : allPhotos.length,
-                product_status: productStatus,
-              });
-            console.log(`${dossier.dossier_number}: foto-upload klaar (${fout ? 'MET FOUT' : 'ok'})`);
-          };
-
-          if (typeof EdgeRuntime !== 'undefined' && (EdgeRuntime as any)?.waitUntil) {
-            (EdgeRuntime as any).waitUntil(fotoTaak());
-          } else {
-            await fotoTaak();
-          }
+        if (result.ok && allPhotos.length > 0 && !fotosOngewijzigd) {
+          fotoWerkNodig = true;
         }
       }
 
@@ -256,7 +250,7 @@ export async function processDossiersToWC(
       }
 
       const success = result.ok;
-      const fotoUploadLoopt = success && !unpublish && (photos?.length ?? 0) > 0;
+      const fotoUploadLoopt = success && !unpublish && (photos?.length ?? 0) > 0 && !fotosOngewijzigd;
       await updateHclPublicationStatus(supabase, dossier.id,
         // Bij lopende achtergrond-fotoupload: 'pending'; de taak zet hem
         // daarna zelf op published/failed.
@@ -284,6 +278,25 @@ export async function processDossiersToWC(
         sku: dossier.dossier_number, action: actionLabel,
       });
       results.push({ dossier: dossier.dossier_number, success: false, error: err.message });
+    }
+  }
+
+  // Foto-worker aftrappen (één keer per run); die werkt alle 'pending'
+  // producten één voor één af en roept zichzelf opnieuw aan tot alles klaar is.
+  if (fotoWerkNodig) {
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    if (cronSecret) {
+      const kickoff = fetch(`${supabaseUrl}/functions/v1/hcl-photo-worker`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${cronSecret}` },
+      }).catch((e) => console.error('Foto-worker kickoff mislukt:', e?.message));
+      if (typeof EdgeRuntime !== 'undefined' && (EdgeRuntime as any)?.waitUntil) {
+        (EdgeRuntime as any).waitUntil(kickoff);
+      } else {
+        await kickoff;
+      }
+    } else {
+      console.error('CRON_SECRET ontbreekt — foto-worker niet gestart');
     }
   }
 

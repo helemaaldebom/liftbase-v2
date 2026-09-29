@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
   buildAdPayload, sendToTruck1, fetchMachineData,
-  updateTruck1PublicationStatus, DETAILS_TABLE,
+  updateTruck1PublicationStatus, DETAILS_TABLE, photoFingerprint,
 } from "../_shared/truck1.ts";
 
 // Dagelijkse Truck1-sync:
@@ -46,9 +46,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: published } = await supabase
       .from('advertisement_publications')
-      .select('dossier_id')
+      .select('dossier_id, metadata')
       .eq('platform', 'truck1')
       .eq('status', 'published');
+    // vingerafdruk van de fotoset zoals die eerder naar Truck1 ging
+    const vorigeFp = new Map((published ?? []).map((p: any) => [p.dossier_id, p.metadata?.photo_fingerprint]));
 
     let toUnpublish: any[] = [];
     if (published?.length) {
@@ -74,9 +76,14 @@ Deno.serve(async (req: Request) => {
     const alreadyPublished = new Set((published ?? []).map((p: any) => p.dossier_id));
     const ads: Record<string, unknown> = {};
     for (const item of publishData) {
+      const isUpdate = alreadyPublished.has(item.dossier.id);
+      // Foto's overslaan als de set ongewijzigd is sinds de vorige publicatie
+      // (Truck1 laat bestaande foto's dan staan) — scheelt elke nacht het
+      // opnieuw ophalen van honderden foto's.
+      const skipImages = isUpdate && vorigeFp.get(item.dossier.id) === photoFingerprint(item.photos);
       ads[item.dossier.dossier_number] = {
-        action: alreadyPublished.has(item.dossier.id) ? 'update' : 'add',
-        ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl),
+        action: isUpdate ? 'update' : 'add',
+        ...buildAdPayload(item.dossier, item.details, item.photos, supabaseUrl, { skipImages }),
       };
     }
     for (const item of unpublishData) {
@@ -89,7 +96,7 @@ Deno.serve(async (req: Request) => {
       await updateTruck1PublicationStatus(supabase, item.dossier.id,
         result.ok ? 'published' : 'failed',
         result.ok ? null : (result.busy ? 'Truck1 API bezet' : JSON.stringify(result.errors).slice(0, 300)),
-        { imp_id: item.dossier.dossier_number, action: 'sync-publish', summary: result.summary, photo_count: item.photos.length });
+        { imp_id: item.dossier.dossier_number, action: 'sync-publish', summary: result.summary, photo_count: item.photos.length, photo_fingerprint: result.ok ? photoFingerprint(item.photos) : vorigeFp.get(item.dossier.id) ?? null });
     }
     for (const item of unpublishData) {
       await updateTruck1PublicationStatus(supabase, item.dossier.id,

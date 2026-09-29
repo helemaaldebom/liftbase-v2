@@ -375,7 +375,8 @@ export function DossiersPage({
         updateData.customer_name = customerName.trim();
         updateData.sold_at = new Date().toISOString();
       } else {
-        updateData.customer_name = null;
+        // Klantnaam NIET wissen: dat veld is ook de algemene klantkoppeling
+        // van het dossier (fix 16-09: klant verdween bij bv. stock -> open)
         updateData.sold_at = null;
       }
 

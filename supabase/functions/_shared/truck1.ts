@@ -5,6 +5,9 @@
 
 export const TRUCK1_ENDPOINT = 'https://www.truck1.eu/-service/API';
 
+import { externeTekst, photoFingerprint } from "./extern.ts";
+export { photoFingerprint };
+
 export const DETAILS_TABLE: Record<string, string> = {
   forklift: 'forklift_details',
   heavy_duty_forklift: 'forklift_details',
@@ -66,8 +69,13 @@ function combi(...parts: unknown[]): string | undefined {
 
 const MAST_MAP: Record<string, number> = { simplex: 1, duplex: 2, triplex: 4 };
 
-/** Bouwt het advertentie-object voor action=add/update. */
-export function buildAdPayload(dossier: any, details: any, photos: any[], supabaseUrl: string) {
+/**
+ * Bouwt het advertentie-object voor action=add/update.
+ * opts.skipImages: bij een update met ongewijzigde fotoset laten we het
+ * images-veld weg — Truck1 wijzigt alleen meegestuurde velden, dus de
+ * bestaande foto's blijven staan en worden niet opnieuw opgehaald.
+ */
+export function buildAdPayload(dossier: any, details: any, photos: any[], supabaseUrl: string, opts: { skipImages?: boolean } = {}) {
   const title = [dossier.brand || dossier.merk, dossier.model || dossier.type].filter(Boolean).join(' ') || dossier.dossier_number;
   const ad: Record<string, unknown> = {
     category: categoryFor(dossier),
@@ -102,9 +110,10 @@ export function buildAdPayload(dossier: any, details: any, photos: any[], supaba
     f_CentralLubrication: boolVal(details?.central_greasing_chassis),
     f_DPF: boolVal(details?.particle_filter),
 
-    // Omschrijving: dossiertekst + externe opmerkingen uit de machinekaart
-    notesen: [dossier.description, details?.external_remarks].map((s) => String(s ?? '').trim()).filter(Boolean).join('\n\n'),
-    images: photos.map((p) => `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`),
+    // UITSLUITREGEL 16-09: alleen whitelisted externe tekst (zie extern.ts),
+    // nooit dossier.description of interne remarks
+    notesen: externeTekst(dossier, details),
+    images: opts.skipImages ? undefined : photos.map((p) => `${supabaseUrl}/storage/v1/object/public/dossier-photos/${p.storage_path}`),
   };
 
   const locId = intVal(Deno.env.get('TRUCK1_LOC_ID'));

@@ -1,6 +1,8 @@
 // Gedeelde Forklift International-logica (XML-interface v4.82)
 // Gebruikt door publish-to-forklift-international en daily-forklift-international-sync.
 
+import { externeTekst } from "./extern.ts";
+
 export const DATA_ENDPOINT = "https://importapi.forklift-international.com/xmlstapler.php";
 export const IMAGE_ENDPOINT = "https://importapi.forklift-international.com/xmlimgstapler.php";
 
@@ -78,7 +80,8 @@ function generateMachineXML(data: MachineData, opts: { extraTags?: string } = {}
     ['internalno', toInternalNo(dossier.dossier_number)],
     ['manufacturer', escapeXml(dossier.brand || dossier.merk || '')],
     ['model', escapeXml(dossier.model || dossier.type || '')],
-    ['chassisno', escapeXml(dossier.serienummer || details?.serial_number || '')],
+    // UITSLUITREGEL 16-09: serienummer is intern, gaat naar GEEN enkel platform
+    ['chassisno', ''],
     ['toc', TOC_MAP[dossier.equipment_type] ?? 0],
     ['condition', mapLookup(CONDITION_MAP, dossier.condition, 4)],
     ['yoc', intVal(dossier.year, dossier.bouwjaar)],
@@ -94,7 +97,9 @@ function generateMachineXML(data: MachineData, opts: { extraTags?: string } = {}
     ['loadcenter', intVal(dossier.load_center, details?.load_center_mm)],
     ['masttype', 0],
     ['tyres', 0],
-    ['userremarks', escapeXml(dossier.description || '')],
+    // UITSLUITREGEL 16-09: alleen whitelisted externe tekst (zie extern.ts),
+    // nooit dossier.description of interne remarks
+    ['userremarks', escapeXml(externeTekst(dossier, details))],
     ['available', ''],
     ['rental', 0],
     ['viewforklift', visible],

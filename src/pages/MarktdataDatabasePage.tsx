@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Download, Search, Filter, Eye, X, Settings, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -569,15 +570,12 @@ export function MarktdataDatabasePage({ onNavigate }: MarktdataDatabasePageProps
         : ''
     ]);
 
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `marktdata_export_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    // Echte Excel (.xlsx) i.p.v. CSV (verzoek Tigran 29-09)
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    worksheet['!cols'] = headers.map((h, i) => ({ wch: [14, 22, 10, 16, 10, 14, 14, 16, 16, 12, 8, 22, 20, 30, 30, 12, 18][i] ?? 15 }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Marktdata');
+    XLSX.writeFile(workbook, `marktdata_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (loading) {

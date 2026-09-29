@@ -335,11 +335,12 @@ export function DossierDetailPage({ dossierId, bidId, onNavigate, returnTo = 'do
     }
 
     try {
-      const updateData: { status: string; sold_at?: string | null; customer_name?: string | null } = { status: newStatus };
+      const updateData: { status: string; sold_at?: string | null } = { status: newStatus };
 
       if (newStatus !== 'sold' && dossier?.status === 'sold') {
+        // Alleen de verkoopdatum wissen; klantnaam NIET, want dat veld is ook
+        // de algemene klantkoppeling (fix 16-09: klant verdween bij statuswissel)
         updateData.sold_at = null;
-        updateData.customer_name = null;
       }
 
       const { error } = await supabase

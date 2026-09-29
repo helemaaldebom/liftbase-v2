@@ -20,7 +20,7 @@ interface PublicationStatus {
 const PLATFORMS = [
   { key: 'hcl', label: 'Eigen website (heavycargolifters.com)', enabled: true, directPublish: true },
   { key: 'forklift_international', label: 'Forklift International', enabled: true, directPublish: true },
-  { key: 'mascus', label: 'Mascus', enabled: true, directPublish: false, hint: 'via Forklift International' },
+  { key: 'mascus', label: 'Mascus', enabled: true, directPublish: true },
   { key: 'truck1', label: 'Truck1.eu', enabled: true, directPublish: true },
 ];
 
@@ -70,6 +70,13 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
 
       if (error) throw error;
 
+      // Direct offline bij uitvinken (i.p.v. wachten op de nachtsync),
+      // maar alleen als er daadwerkelijk iets gepubliceerd staat.
+      const pubStatus = publications.find(p => p.platform === platform);
+      if (!enabled && pubStatus && ['published', 'pending'].includes(pubStatus.status)) {
+        await executeUnpublish(platform);
+      }
+
       await loadData();
     } catch (error) {
       console.error('Error updating platform setting:', error);
@@ -79,10 +86,44 @@ export function PublicationSection({ dossierId, isManager, onPublicationUpdate }
     }
   };
 
+  const executeUnpublish = async (platform: string) => {
+    const functionName = PUBLISH_FUNCTIONS[platform];
+    if (!functionName) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Niet ingelogd');
+      // F.I. is een totaalvervanger: opnieuw publiceren van de complete set
+      // zet dit (nu uitgevinkte) dossier automatisch offline. De andere
+      // platforms hebben een echte unpublish-actie.
+      const body = platform === 'forklift_international'
+        ? { dossierIds: [dossierId] }
+        : { dossierIds: [dossierId], action: 'unpublish' };
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        alert(`⚠️ Vinkje staat uit, maar direct offline halen is niet gelukt (${result.error || 'platformfout'}).\nDe nachtelijke synchronisatie haalt de advertentie alsnog offline.`);
+      }
+    } catch (error: any) {
+      console.error('Error unpublishing:', error);
+      alert(`⚠️ Vinkje staat uit, maar direct offline halen is niet gelukt (${error.message}).\nDe nachtelijke synchronisatie haalt de advertentie alsnog offline.`);
+    }
+  };
+
   const PUBLISH_FUNCTIONS: Record<string, string> = {
     forklift_international: 'publish-to-forklift-international',
     hcl: 'publish-to-hcl-website',
     truck1: 'publish-to-truck1',
+    mascus: 'publish-to-mascus',
   };
 
   const PLATFORM_LABELS: Record<string, string> = {
