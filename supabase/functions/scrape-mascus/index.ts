@@ -114,8 +114,7 @@ Deno.serve(async (req: Request) => {
           await supabase
             .from("dossiers")
             .update({
-              last_scraped_check: new Date().toISOString(),
-              advertentie_actief: true
+              last_scraped_check: new Date().toISOString()
             })
             .eq("id", existing.id);
           
@@ -150,7 +149,6 @@ Deno.serve(async (req: Request) => {
             is_scraped: true,
             scraped_at: new Date().toISOString(),
             last_scraped_check: new Date().toISOString(),
-            advertentie_actief: true,
             status: "marktdata",
             omschrijving: listing.description || ""
           });
