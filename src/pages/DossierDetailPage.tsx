@@ -1298,7 +1298,7 @@ export function DossierDetailPage({ dossierId, bidId, onNavigate, returnTo = 'do
             <div className="pt-6 border-t border-slate-200">
               <h3 className="text-lg font-semibold text-slate-800 mb-3">Prijzen</h3>
               <div className="space-y-6">
-                <div className="grid grid-cols-5 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 md:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-500 mb-1">
                       Inkoopprijs (€)
